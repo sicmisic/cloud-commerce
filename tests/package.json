@@ -1,0 +1,24 @@
+{
+  "name": "@cloud-commerce/tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-package unit, contract, integration, and E2E tests.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@cloud-commerce/api": "workspace:*",
+    "@cloud-commerce/auth": "workspace:*",
+    "@cloud-commerce/config": "workspace:*",
+    "@cloud-commerce/database": "workspace:*",
+    "@cloud-commerce/domain": "workspace:*",
+    "@cloud-commerce/events": "workspace:*",
+    "@cloud-commerce/integrations": "workspace:*",
+    "@cloud-commerce/logging": "workspace:*",
+    "@cloud-commerce/validation": "workspace:*",
+    "@cloud-commerce/workers": "workspace:*",
+    "@types/aws-lambda": "^8.10.140",
+    "@types/pg": "^8.11.6",
+    "pg": "^8.12.0"
+  }
+}

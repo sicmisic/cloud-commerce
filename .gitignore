@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+build/
+coverage/
+
+# CDK
+infrastructure/cdk.out/
+cdk.out/
+.cdk.staging/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+
+# Frontend
+apps/frontend/dist/
+apps/frontend/.vite/
+
+# Test artifacts
+tests/**/__snapshots__/*.snap.new
+.vitest-report/

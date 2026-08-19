@@ -1,0 +1,85 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.2.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Typecheck (build)
+        run: pnpm typecheck
+
+      - name: Typecheck tests
+        run: pnpm exec tsc -p tests/tsconfig.json
+
+      - name: Unit + contract tests
+        run: pnpm test:unit && pnpm test:contract
+
+      - name: E2E tests
+        run: pnpm test:e2e
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: commerce
+          POSTGRES_PASSWORD: commerce
+          POSTGRES_DB: commerce_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U commerce"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      dynamodb:
+        image: amazon/dynamodb-local:2.5.2
+        ports: ['8000:8000']
+    env:
+      DATABASE_URL: postgres://commerce:commerce@localhost:5432/commerce_test
+      DYNAMODB_ENDPOINT: http://localhost:8000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.2.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Integration tests
+        run: pnpm test:integration

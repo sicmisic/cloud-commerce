@@ -1,0 +1,27 @@
+{
+  "name": "@cloud-commerce/infrastructure",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "cloud-commerce": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "synth": "cdk synth --quiet",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy --all --require-approval never",
+    "destroy": "cdk destroy --all --force"
+  },
+  "dependencies": {
+    "@cloud-commerce/config": "workspace:*",
+    "aws-cdk-lib": "^2.150.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "aws-cdk": "^2.150.0",
+    "esbuild": "^0.23.0",
+    "ts-node": "^10.9.2"
+  }
+}

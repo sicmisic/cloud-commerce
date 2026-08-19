@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+cdk.out
+pnpm-lock.yaml
+*.tsbuildinfo
+apps/frontend/dist
+docs/openapi.json

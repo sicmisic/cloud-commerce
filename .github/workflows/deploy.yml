@@ -1,0 +1,89 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC federation to AWS — no long-lived keys
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.2.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @cloud-commerce/infrastructure synth
+        env:
+          ENV: staging
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.2.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_STAGING }}
+          aws-region: us-east-1
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy
+        run: pnpm --filter @cloud-commerce/infrastructure deploy
+        env:
+          ENV: staging
+      - name: Smoke test
+        run: pnpm test:e2e
+        env:
+          SMOKE_BASE_URL: ${{ vars.STAGING_API_URL }}
+
+  deploy-production:
+    needs: deploy-staging
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production # requires manual approval (GitHub environment protection rule)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.2.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PRODUCTION }}
+          aws-region: us-east-1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @cloud-commerce/infrastructure deploy
+        env:
+          ENV: production

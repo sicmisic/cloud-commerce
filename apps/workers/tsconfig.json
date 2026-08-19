@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node", "aws-lambda"]
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/config" },
+    { "path": "../../packages/database" },
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/events" },
+    { "path": "../../packages/integrations" },
+    { "path": "../../packages/logging" }
+  ]
+}

@@ -1,0 +1,27 @@
+# Local datastores for development and integration tests.
+#   docker compose up -d
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:2.5.2
+    command: ['-jar', 'DynamoDBLocal.jar', '-inMemory', '-sharedDb']
+    ports:
+      - '8000:8000'
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: commerce
+      POSTGRES_PASSWORD: commerce
+      POSTGRES_DB: commerce
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U commerce']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

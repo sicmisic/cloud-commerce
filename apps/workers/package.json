@@ -1,0 +1,22 @@
+{
+  "name": "@cloud-commerce/workers",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@cloud-commerce/config": "workspace:*",
+    "@cloud-commerce/database": "workspace:*",
+    "@cloud-commerce/domain": "workspace:*",
+    "@cloud-commerce/events": "workspace:*",
+    "@cloud-commerce/integrations": "workspace:*",
+    "@cloud-commerce/logging": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140"
+  }
+}

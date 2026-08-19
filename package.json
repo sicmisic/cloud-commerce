@@ -1,0 +1,43 @@
+{
+  "name": "cloud-commerce",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud Commerce & Inventory API — event-driven commerce backend on AWS (portfolio project).",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.2.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "typecheck": "tsc --build --pretty",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit packages",
+    "test:contract": "vitest run tests/contract",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:e2e": "vitest run tests/e2e",
+    "test:watch": "vitest",
+    "infra:synth": "pnpm --filter @cloud-commerce/infrastructure synth"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  }
+}

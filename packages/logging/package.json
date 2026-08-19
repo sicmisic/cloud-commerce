@@ -1,0 +1,15 @@
+{
+  "name": "@cloud-commerce/logging",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@cloud-commerce/config": "workspace:*",
+    "pino": "^9.2.0"
+  }
+}

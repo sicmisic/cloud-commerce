@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/config" },
+    { "path": "packages/logging" },
+    { "path": "packages/validation" },
+    { "path": "packages/domain" },
+    { "path": "packages/events" },
+    { "path": "packages/database" },
+    { "path": "packages/integrations" },
+    { "path": "packages/auth" },
+    { "path": "apps/api" },
+    { "path": "apps/workers" },
+    { "path": "infrastructure" }
+  ]
+}

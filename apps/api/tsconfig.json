@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node", "aws-lambda"]
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/config" },
+    { "path": "../../packages/logging" },
+    { "path": "../../packages/validation" },
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/events" },
+    { "path": "../../packages/database" },
+    { "path": "../../packages/integrations" },
+    { "path": "../../packages/auth" }
+  ]
+}
