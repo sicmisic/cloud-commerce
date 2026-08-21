@@ -55,7 +55,7 @@ flowchart LR
 | Health / readiness endpoints                                       | ✅ Phase 1 |
 | Structured logging + correlation IDs end to end                    | ✅ Phase 1 |
 | CloudWatch EMF metrics + RFC7807 error responses                   | ✅ Phase 1 |
-| Product catalog CRUD, filtering, pagination, inventory reservation | 🔜 Phase 2 |
+| Product catalog CRUD, filtering, pagination, inventory reservation | ✅ Phase 2 |
 | Orders: customers / orders / items / payments / shipments          | 🔜 Phase 3 |
 | Async processing: EventBridge, SQS workers, DLQs, idempotency      | 🔜 Phase 4 |
 | Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | 🔜 Phase 5 |
@@ -244,8 +244,8 @@ Tracked as they are deferred:
 | Phase | Scope                                                                                                                                                                                           | State   |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | 1     | Foundation: monorepo, TS project refs, ESLint/Prettier, base packages (config, logging, validation, domain), CDK skeleton (5 stacks), one Lambda + HTTP API route end to end, GitHub Actions CI | ✅ done |
-| 2     | Catalog: Product CRUD on DynamoDB, access-pattern-driven keys, Zod validation, pagination, filtering, inventory reservation, unit + integration tests                                           | ⬜ next |
-| 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ⬜      |
+| 2     | Catalog: Product CRUD on DynamoDB, access-pattern-driven keys, Zod validation, pagination, filtering, inventory reservation, unit + integration tests                                           | ✅ done |
+| 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ⬜ next |
 | 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ⬜      |
 | 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ⬜      |
 | 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ⬜      |
@@ -269,3 +269,25 @@ DLQs (Phase 4); alarms + dashboard widgets + the failure-scenario runbook
 (Phase 6); OpenAPI spec + storefront (Phase 7). The `logRetention` → explicit
 `LogGroup` migration is done for the API function; worker functions get the same
 treatment when they are created.
+
+### Phase 2 — what was built / what is deferred
+
+**Built:** `domain/product` — `Product` aggregate (`createProduct`,
+`applyUpdate`, `isSellable`), `ProductRepository` port, `CatalogService`
+(create/read/list/update/archive/adjust-stock/reserve/release), and a reference
+`InMemoryProductRepository` that mirrors the DynamoDB semantics. `database` —
+`DynamoProductRepository` with a keys module (`product-keys.ts`) mapping each of
+the five access patterns to a `GetItem`/`Query`/conditional `UpdateItem`; no
+`Scan`. `validation` — `createProductSchema` / `updateProductSchema` /
+`listProductsQuerySchema` / `adjustStockSchema` (SKU normalised to upper-case,
+price in minor units). `api` — `ProductController` (thin), catalog routes, and a
+composition-root `container.ts` with test seams. Infra — `catalog` table gains
+GSI1 (category) / GSI2 (SKU) / GSI3 (status). Tests — 22 new (product domain,
+CatalogService incl. the oversell-under-concurrency case, product E2E through
+the handler) + a DynamoDB-Local integration suite that self-skips without
+`DYNAMODB_ENDPOINT` and runs in CI.
+
+**Deferred:** inventory-reservation **events** (`InventoryReserved` /
+`InventoryReservationFailed`) are emitted by the Phase 4 inventory worker, not
+the catalog service; product-image upload (presigned S3 `PUT`) is Phase 7;
+full-text search is a documented Future Improvement (OpenSearch).

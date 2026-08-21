@@ -4,32 +4,40 @@
 
 ### Access patterns (defined before implementation — CLAUDE.md §4)
 
-| #   | Pattern                               | Key structure                                                      | Phase |
-| --- | ------------------------------------- | ------------------------------------------------------------------ | ----- |
-| 1   | Get product by id                     | `GetItem` `PK = PRODUCT#<id>`, `SK = PRODUCT#<id>`                 | 2     |
-| 2   | List products by category (paginated) | `Query` GSI1 `GSI1PK = CATEGORY#<category>`                        | 2     |
-| 3   | Find product by SKU                   | `Query` GSI2 `GSI2PK = SKU#<sku>` (limit 1)                        | 2     |
-| 4   | List active products (paginated)      | `Query` GSI1 `GSI1PK = STATUS#active`, sort by `GSI1SK = <name>`   | 2     |
-| 5   | Reserve inventory for a product       | `UpdateItem` `PK/SK` with `ConditionExpression: available >= :qty` | 2     |
+| #   | Pattern                               | Key structure                                                         | Status |
+| --- | ------------------------------------- | --------------------------------------------------------------------- | ------ |
+| 1   | Get product by id                     | `GetItem` `PK = PRODUCT#<id>`, `SK = PRODUCT#<id>`                    | ✅     |
+| 2   | List products by category (paginated) | `Query` GSI1 `GSI1PK = CATEGORY#<category>`, `GSI1SK` = `<name>#<id>` | ✅     |
+| 3   | Find product by SKU                   | `Query` GSI2 `GSI2PK = SKU#<sku>` (Limit 1)                           | ✅     |
+| 4   | List products by status (paginated)   | `Query` GSI3 `GSI3PK = STATUS#<status>`, `GSI3SK` = `<name>#<id>`     | ✅     |
+| 5   | Reserve inventory for a product       | `UpdateItem` `PK/SK` `ConditionExpression: available >= :qty`         | ✅     |
 
 `Scan` is never used on the request path (enforced by ESLint
-`no-restricted-syntax`).
+`no-restricted-syntax`). Listing by category **and** status uses pattern 2 plus
+a `status` `FilterExpression` — a category partition is small, so the filter is
+cheap.
 
-### Item shapes _(Phase 2)_
+### Item shape
+
+One item per product (`packages/database/src/dynamo/product-keys.ts`):
 
 ```
 PRODUCT
-  PK      = PRODUCT#<id>
-  SK      = PRODUCT#<id>
-  GSI1PK  = CATEGORY#<category>
-  GSI1SK  = PRODUCT#<name>#<id>
-  GSI2PK  = SKU#<sku>
-  ... attributes: name, description, priceAmount, priceCurrency, status,
-      available, reserved, version, createdAt, updatedAt
+  PK      = PRODUCT#<id>          SK     = PRODUCT#<id>
+  GSI1PK  = CATEGORY#<category>   GSI1SK = <name-lower>#<id>     (pattern 2)
+  GSI2PK  = SKU#<sku-upper>                                     (pattern 3)
+  GSI3PK  = STATUS#<status>       GSI3SK = <name-lower>#<id>     (pattern 4)
+  attributes: id, sku, name, description, category, status,
+              priceAmount, priceCurrency, available, reserved,
+              imageKeys[], version, createdAt, updatedAt
 ```
 
-A second GSI1 partition per product (`STATUS#<status>`) is written as a mirror
-item so pattern 4 works without a filter. _(Detailed in Phase 2.)_
+`version` is bumped on every write. `create` uses
+`ConditionExpression: attribute_not_exists(PK)`; `update` uses
+`attribute_exists(PK) AND version = :expected` (optimistic concurrency).
+Inventory mutations (`reserveInventory` / `releaseInventory` / `adjustAvailable`)
+are single `UpdateItem` calls with a guard condition and never touch
+name/category/status, so the derived GSI sort keys stay valid without a rewrite.
 
 ## DynamoDB — `idempotency` table
 

@@ -8,3 +8,8 @@
  */
 export { getDocumentClient, resetDocumentClient } from './dynamo/client';
 export { getSecretString, getSecretJson, resetSecretsCache } from './secrets';
+export {
+  DynamoProductRepository,
+  type DynamoProductRepositoryOptions,
+} from './dynamo/product-repository';
+export * as productKeys from './dynamo/product-keys';

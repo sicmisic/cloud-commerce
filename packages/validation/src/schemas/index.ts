@@ -4,4 +4,4 @@
  *   - order    (Phase 3)
  *   - admin    (Phase 4)
  */
-export {};
+export * from './product';

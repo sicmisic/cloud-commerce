@@ -13,8 +13,10 @@ export interface DatabaseStackProps extends StackProps {
  * DynamoDB for the product catalog + idempotency records (CLAUDE.md §2).
  * PostgreSQL/RDS is added in Phase 3 as `RdsStack`.
  *
- * Catalog GSIs are added in Phase 2 once access patterns are documented in
- * docs/database.md (CLAUDE.md §4).
+ * Catalog GSIs map 1:1 to the documented access patterns (docs/database.md §4):
+ *   GSI1 — list products by category   (GSI1PK = CATEGORY#<c>, GSI1SK = name#id)
+ *   GSI2 — find product by SKU (unique) (GSI2PK = SKU#<sku>)
+ *   GSI3 — list products by status      (GSI3PK = STATUS#<s>,  GSI3SK = name#id)
  */
 export class DatabaseStack extends Stack {
   readonly catalogTable: dynamodb.Table;
@@ -34,7 +36,7 @@ export class DatabaseStack extends Stack {
       deletionProtection: env.retainData,
     });
 
-    // GSI1 — list/query products by category and by status (Phase 2 patterns 2 & 4).
+    // GSI1 — list products by category (pattern 2).
     this.catalogTable.addGlobalSecondaryIndex({
       indexName: 'GSI1',
       partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
@@ -42,10 +44,18 @@ export class DatabaseStack extends Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // GSI2 — find product by SKU (Phase 2 pattern 3).
+    // GSI2 — find product by SKU (pattern 3).
     this.catalogTable.addGlobalSecondaryIndex({
       indexName: 'GSI2',
       partitionKey: { name: 'GSI2PK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI3 — list active products (pattern 4).
+    this.catalogTable.addGlobalSecondaryIndex({
+      indexName: 'GSI3',
+      partitionKey: { name: 'GSI3PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI3SK', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
 

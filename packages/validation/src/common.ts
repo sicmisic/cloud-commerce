@@ -23,9 +23,11 @@ export const paginationQuery = z.object({
 
 export const sku = z
   .string()
+  .trim()
   .min(3)
   .max(64)
-  .regex(/^[A-Z0-9][A-Z0-9-]*$/, 'SKU must be uppercase alphanumeric with dashes');
+  .regex(/^[A-Za-z0-9][A-Za-z0-9-]*$/, 'SKU must be alphanumeric with dashes')
+  .transform((s) => s.toUpperCase());
 
 export const slug = z
   .string()

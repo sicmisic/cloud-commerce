@@ -7,6 +7,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.614.0",
+    "@aws-sdk/lib-dynamodb": "^3.614.0",
     "@cloud-commerce/api": "workspace:*",
     "@cloud-commerce/auth": "workspace:*",
     "@cloud-commerce/config": "workspace:*",

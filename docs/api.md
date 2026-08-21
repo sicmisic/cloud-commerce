@@ -28,16 +28,21 @@ The machine-readable contract is `docs/openapi.yaml` _(finalised in Phase 7)_.
 | `GET`  | `/health/ready` | none | Readiness — which downstreams are configured                |
 | `GET`  | `/`             | none | Alias for `/health`                                         |
 
-### Phase 2 — catalog _(planned)_
+### Phase 2 — catalog ✅
 
-| Method   | Path                     | Auth       | Description                                                 |
-| -------- | ------------------------ | ---------- | ----------------------------------------------------------- |
-| `GET`    | `/products`              | none       | List/filter products (`?category=`, `?status=`, pagination) |
-| `GET`    | `/products/{id}`         | none       | Get one product                                             |
-| `GET`    | `/products/by-sku/{sku}` | none       | Look up by SKU                                              |
-| `POST`   | `/products`              | OPERATIONS | Create a product                                            |
-| `PATCH`  | `/products/{id}`         | OPERATIONS | Update a product                                            |
-| `DELETE` | `/products/{id}`         | OPERATIONS | Archive a product                                           |
+| Method   | Path                              | Auth            | Description                                                            |
+| -------- | --------------------------------- | --------------- | ---------------------------------------------------------------------- |
+| `GET`    | `/products`                       | none            | List/filter products (`?category=`, `?status=`, `?limit=`, `?cursor=`) |
+| `GET`    | `/products/{id}`                  | none            | Get one product                                                        |
+| `GET`    | `/products/by-sku/{sku}`          | none            | Look up by SKU                                                         |
+| `POST`   | `/products`                       | `catalog:write` | Create a product                                                       |
+| `PATCH`  | `/products/{id}`                  | `catalog:write` | Update a product (name/description/category/price/status/images)       |
+| `DELETE` | `/products/{id}`                  | `catalog:write` | Archive a product (rejected if it has active reservations)             |
+| `POST`   | `/products/{id}/inventory/adjust` | `catalog:write` | Restock / correct on-hand stock (`{ delta, reason? }`)                 |
+
+`POST /products` returns `409 conflict` on a duplicate SKU. Stock adjustment
+below zero returns `409 insufficient-inventory`. A product list response is
+`{ items: [...], nextCursor: string | null }`.
 
 ### Phase 3 — orders _(planned)_
 

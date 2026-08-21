@@ -11,3 +11,4 @@
  *   - order      (Phase 3)
  */
 export * from './shared';
+export * from './product';
