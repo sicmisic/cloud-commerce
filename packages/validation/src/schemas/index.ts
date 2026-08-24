@@ -5,3 +5,4 @@
  *   - admin    (Phase 4)
  */
 export * from './product';
+export * from './order';

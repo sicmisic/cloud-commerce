@@ -6,6 +6,8 @@ import { ApiStack } from '../stacks/api';
 import { DatabaseStack } from '../stacks/database';
 import { MessagingStack } from '../stacks/messaging';
 import { MonitoringStack } from '../stacks/monitoring';
+import { NetworkStack } from '../stacks/network';
+import { RdsStack } from '../stacks/rds';
 import { StorageStack } from '../stacks/storage';
 
 const app = new App();
@@ -18,6 +20,14 @@ const env = { account: envConfig.account, region: envConfig.region };
 const storage = new StorageStack(app, `Storage-${envConfig.name}`, { env, envConfig });
 const database = new DatabaseStack(app, `Database-${envConfig.name}`, { env, envConfig });
 const messaging = new MessagingStack(app, `Messaging-${envConfig.name}`, { env, envConfig });
+const network = new NetworkStack(app, `Network-${envConfig.name}`, { env, envConfig });
+
+const rds = new RdsStack(app, `Rds-${envConfig.name}`, {
+  env,
+  envConfig,
+  vpc: network.vpc,
+  appSecurityGroup: network.lambdaSecurityGroup,
+});
 
 const api = new ApiStack(app, `Api-${envConfig.name}`, {
   env,
@@ -25,6 +35,9 @@ const api = new ApiStack(app, `Api-${envConfig.name}`, {
   catalogTable: database.catalogTable,
   idempotencyTable: database.idempotencyTable,
   eventBus: messaging.eventBus,
+  vpc: network.vpc,
+  securityGroup: network.lambdaSecurityGroup,
+  databaseSecret: rds.secret,
 });
 
 new MonitoringStack(app, `Monitoring-${envConfig.name}`, {

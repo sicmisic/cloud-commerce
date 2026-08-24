@@ -2,19 +2,14 @@ import { type Page, type PageRequest } from '../shared/pagination';
 
 import { type Product, type ProductStatus } from './product';
 
-/** Filters accepted from the API before the limit is normalised. */
-export interface ListProductsInput {
-  readonly limit?: number;
-  readonly cursor?: string;
-  readonly category?: string;
-  readonly status?: ProductStatus;
-}
-
-/** What the repository receives — limit is always resolved by the service. */
+/** Catalog list filters. `limit` is normalised by {@link CatalogService}. */
 export interface ListProductsQuery extends PageRequest {
   readonly category?: string;
   readonly status?: ProductStatus;
 }
+
+/** @deprecated alias kept for callers — identical to {@link ListProductsQuery}. */
+export type ListProductsInput = ListProductsQuery;
 
 /**
  * Persistence port for the catalog. Implemented by

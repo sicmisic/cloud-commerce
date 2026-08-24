@@ -56,7 +56,7 @@ flowchart LR
 | Structured logging + correlation IDs end to end                    | ✅ Phase 1 |
 | CloudWatch EMF metrics + RFC7807 error responses                   | ✅ Phase 1 |
 | Product catalog CRUD, filtering, pagination, inventory reservation | ✅ Phase 2 |
-| Orders: customers / orders / items / payments / shipments          | 🔜 Phase 3 |
+| Orders: customers / orders / items / payments / shipments          | ✅ Phase 3 |
 | Async processing: EventBridge, SQS workers, DLQs, idempotency      | 🔜 Phase 4 |
 | Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | 🔜 Phase 5 |
 | Alarms, dashboards, deliberate failure scenario + runbook          | 🔜 Phase 6 |
@@ -245,8 +245,8 @@ Tracked as they are deferred:
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | 1     | Foundation: monorepo, TS project refs, ESLint/Prettier, base packages (config, logging, validation, domain), CDK skeleton (5 stacks), one Lambda + HTTP API route end to end, GitHub Actions CI | ✅ done |
 | 2     | Catalog: Product CRUD on DynamoDB, access-pattern-driven keys, Zod validation, pagination, filtering, inventory reservation, unit + integration tests                                           | ✅ done |
-| 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ⬜ next |
-| 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ⬜      |
+| 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ✅ done |
+| 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ⬜ next |
 | 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ⬜      |
 | 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ⬜      |
 | 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ⬜      |
@@ -291,3 +291,33 @@ the handler) + a DynamoDB-Local integration suite that self-skips without
 `InventoryReservationFailed`) are emitted by the Phase 4 inventory worker, not
 the catalog service; product-image upload (presigned S3 `PUT`) is Phase 7;
 full-text search is a documented Future Improvement (OpenSearch).
+
+### Phase 3 — what was built / what is deferred
+
+**Built:** `domain/customer` (Customer aggregate, `CustomerService`, port +
+in-memory repo) and `domain/order` — the `Order` aggregate with an explicit
+state machine (`pending→confirmed→processing→fulfilled` / `→cancelled`), a pure
+`priceOrder` policy (8% tax, free shipping ≥ $75), `Payment` / `Shipment`
+sub-entities, domain events (`OrderCreated`, `PaymentRequested`,
+`OrderCancelled`), the `OrderRepository` port, and `OrderService` —
+**the cross-datastore use case**: resolve prices from the DynamoDB catalog →
+reserve inventory (conditional writes) → persist order+items+payment+shipment in
+one Postgres transaction → publish events, with **compensating inventory
+release on every failure path** and idempotency-key replay. `database` —
+`getPool` (credentials from Secrets Manager by ARN, or `DATABASE_URL` locally),
+`withTransaction`, `PostgresCustomerRepository`, `PostgresOrderRepository`, and
+the SQL migration (`node-pg-migrate`) with every index documented.
+`validation` — order / customer schemas. `api` — `OrderController` /
+`CustomerController` with ownership checks (own vs `order:read:any`), routes,
+container wiring. Infra — `NetworkStack` (VPC, no NAT, VPC endpoints),
+`RdsStack` (Postgres 16, generated-secret credentials); the API Lambda now runs
+in the VPC with a scoped SG and `secret.grantRead`. Tests — 23 new (order +
+pricing domain, `OrderService` incl. compensation & idempotency, order E2E
+through the handler) + a Postgres integration suite (self-skips without
+`DATABASE_URL`, runs migrations then hits a real DB in CI). 77 pass / 12 skip.
+
+**Deferred:** the DynamoDB HTTP-layer idempotency store (ADR 004) lands in
+Phase 4 — Phase 3 relies on the `orders.idempotency_key` unique index as the
+safety net and the service's replay check. Payment capture / email / shipping
+are just events + rows now; their workers are Phase 4. RDS Proxy for connection
+pooling is a documented Future Improvement.

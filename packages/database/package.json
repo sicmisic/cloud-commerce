@@ -7,8 +7,9 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "migrate:up": "node ./scripts/migrate.mjs up",
-    "migrate:down": "node ./scripts/migrate.mjs down"
+    "migrate:up": "node-pg-migrate up -j sql -m src/postgres/migrations",
+    "migrate:down": "node-pg-migrate down -j sql -m src/postgres/migrations",
+    "migrate:create": "node-pg-migrate create -j sql -m src/postgres/migrations --"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.614.0",
@@ -21,6 +22,7 @@
     "pg": "^8.12.0"
   },
   "devDependencies": {
-    "@types/pg": "^8.11.6"
+    "@types/pg": "^8.11.6",
+    "node-pg-migrate": "^7.6.1"
   }
 }

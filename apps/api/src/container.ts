@@ -1,42 +1,108 @@
 import { getConfig } from '@cloud-commerce/config';
-import { DynamoProductRepository } from '@cloud-commerce/database';
-import { CatalogService, type ProductRepository } from '@cloud-commerce/domain';
+import {
+  DynamoProductRepository,
+  PostgresCustomerRepository,
+  PostgresOrderRepository,
+} from '@cloud-commerce/database';
+import {
+  CatalogService,
+  CustomerService,
+  OrderService,
+  type CustomerRepository,
+  type EventPublisher,
+  type OrderRepository,
+  type ProductRepository,
+} from '@cloud-commerce/domain';
+import { EventBridgeEventPublisher, InMemoryEventPublisher } from '@cloud-commerce/events';
+import { logger } from '@cloud-commerce/logging';
 
 /**
  * Composition root. Wires application services to their adapters based on
- * config, once per warm container. Tests override the ports via the
- * `__set*` seams instead of standing up AWS.
+ * config, once per warm container. Tests override the ports via
+ * {@link __setContainer} instead of standing up AWS / Postgres.
  */
 
-let productRepository: ProductRepository | undefined;
-let catalogService: CatalogService | undefined;
+interface Container {
+  productRepository?: ProductRepository;
+  customerRepository?: CustomerRepository;
+  orderRepository?: OrderRepository;
+  eventPublisher?: EventPublisher;
+  catalogService?: CatalogService;
+  customerService?: CustomerService;
+  orderService?: OrderService;
+}
+
+const c: Container = {};
 
 export function getProductRepository(): ProductRepository {
-  if (!productRepository) {
-    productRepository = new DynamoProductRepository({
-      tableName: getConfig().dynamodb.catalogTableName,
-    });
+  c.productRepository ??= new DynamoProductRepository({
+    tableName: getConfig().dynamodb.catalogTableName,
+  });
+  return c.productRepository;
+}
+
+export function getCustomerRepository(): CustomerRepository {
+  c.customerRepository ??= new PostgresCustomerRepository();
+  return c.customerRepository;
+}
+
+export function getOrderRepository(): OrderRepository {
+  c.orderRepository ??= new PostgresOrderRepository();
+  return c.orderRepository;
+}
+
+export function getEventPublisher(): EventPublisher {
+  if (!c.eventPublisher) {
+    const { messaging } = getConfig();
+    c.eventPublisher = new EventBridgeEventPublisher({ eventBusName: messaging.eventBusName });
   }
-  return productRepository;
+  return c.eventPublisher;
 }
 
 export function getCatalogService(): CatalogService {
-  if (!catalogService) {
-    catalogService = new CatalogService(getProductRepository());
-  }
-  return catalogService;
+  c.catalogService ??= new CatalogService(getProductRepository());
+  return c.catalogService;
 }
 
-/** Test seam — inject fakes and reset between suites. */
-export function __setContainer(overrides: {
-  productRepository?: ProductRepository;
-  catalogService?: CatalogService;
-}): void {
-  if (overrides.productRepository) productRepository = overrides.productRepository;
-  if (overrides.catalogService) catalogService = overrides.catalogService;
+export function getCustomerService(): CustomerService {
+  c.customerService ??= new CustomerService(getCustomerRepository());
+  return c.customerService;
+}
+
+export function getOrderService(): OrderService {
+  c.orderService ??= new OrderService({
+    customers: getCustomerRepository(),
+    catalog: getCatalogService(),
+    orders: getOrderRepository(),
+    events: getEventPublisher(),
+    paymentProviderName: getConfig().providers.payment,
+    logger: logger('OrderService'),
+  });
+  return c.orderService;
+}
+
+/** Test seam — inject fakes. Any service left unset is rebuilt lazily from the
+ * (also overridable) repositories. */
+export function __setContainer(overrides: Partial<Container>): void {
+  Object.assign(c, overrides);
+  // Rebuild derived services so they pick up injected repositories.
+  if (overrides.productRepository && !overrides.catalogService) c.catalogService = undefined;
+  if (overrides.customerRepository && !overrides.customerService) c.customerService = undefined;
+  if (
+    (overrides.orderRepository || overrides.eventPublisher || overrides.productRepository) &&
+    !overrides.orderService
+  ) {
+    c.orderService = undefined;
+  }
 }
 
 export function __resetContainer(): void {
-  productRepository = undefined;
-  catalogService = undefined;
+  for (const key of Object.keys(c) as (keyof Container)[]) delete c[key];
+}
+
+/** For tests that need to assert on published events. */
+export function __installInMemoryEventPublisher(): InMemoryEventPublisher {
+  const publisher = new InMemoryEventPublisher();
+  __setContainer({ eventPublisher: publisher });
+  return publisher;
 }

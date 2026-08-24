@@ -4,7 +4,8 @@
  */
 
 export interface PageRequest {
-  readonly limit: number;
+  /** Requested page size; callers normalise with {@link normalizeLimit}. */
+  readonly limit?: number;
   /** Opaque cursor returned by a previous page. */
   readonly cursor?: string;
 }

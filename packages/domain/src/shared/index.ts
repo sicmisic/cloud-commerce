@@ -3,3 +3,4 @@ export * from './money';
 export * from './pagination';
 export * from './ids';
 export * from './events';
+export * from './logger';

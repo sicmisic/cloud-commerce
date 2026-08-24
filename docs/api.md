@@ -44,14 +44,22 @@ The machine-readable contract is `docs/openapi.yaml` _(finalised in Phase 7)_.
 below zero returns `409 insufficient-inventory`. A product list response is
 `{ items: [...], nextCursor: string | null }`.
 
-### Phase 3 — orders _(planned)_
+### Phase 3 — customers & orders ✅
 
-| Method | Path                     | Auth                        | Description                                  |
-| ------ | ------------------------ | --------------------------- | -------------------------------------------- |
-| `POST` | `/orders`                | CUSTOMER                    | Create an order (requires `Idempotency-Key`) |
-| `GET`  | `/orders/{id}`           | CUSTOMER (own) / OPERATIONS | Get an order                                 |
-| `GET`  | `/customers/{id}/orders` | CUSTOMER (own) / OPERATIONS | List a customer's orders                     |
-| `POST` | `/orders/{id}/cancel`    | OPERATIONS                  | Cancel + release inventory                   |
+| Method | Path                     | Auth                                | Description                                                                                        |
+| ------ | ------------------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `POST` | `/customers`             | authenticated                       | Register a customer profile (idempotent by email; linked to the caller's auth subject)             |
+| `GET`  | `/customers/me`          | authenticated                       | The caller's customer profile, or `{ registered: false }`                                          |
+| `POST` | `/orders`                | `order:create`                      | Create an order — **requires `Idempotency-Key`**; prices are resolved server-side from the catalog |
+| `GET`  | `/orders/{id}`           | `order:read:own` / `order:read:any` | Get an order with items, payments, shipments                                                       |
+| `GET`  | `/customers/{id}/orders` | own / `order:read:any`              | List a customer's orders, newest first (paginated)                                                 |
+| `POST` | `/orders/{id}/cancel`    | `order:cancel:any`                  | Cancel + release reserved inventory (`202`)                                                        |
+
+Order creation: validate → resolve prices from the catalog → **reserve
+inventory** (conditional writes; compensating release on any later failure) →
+persist order+items+payment+shipment in one Postgres transaction → publish
+`OrderCreated` + `PaymentRequested`. Out-of-stock returns
+`409 insufficient-inventory`; an unregistered caller returns `409`.
 
 ### Phase 4 — admin _(planned)_
 

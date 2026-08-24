@@ -4,9 +4,11 @@ import { Stack, type StackProps, CfnOutput, Duration } from 'aws-cdk-lib';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import type * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import type * as events from 'aws-cdk-lib/aws-events';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import type * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { type Construct } from 'constructs';
 
 import { type EnvConfig } from '../config/environments';
@@ -18,8 +20,12 @@ export interface ApiStackProps extends StackProps {
   readonly catalogTable: dynamodb.ITable;
   readonly idempotencyTable: dynamodb.ITable;
   readonly eventBus: events.IEventBus;
-  /** Secret ARNs the API is allowed to read (Phase 3+). */
-  readonly databaseSecretArn?: string;
+  /** VPC to place the function in so it can reach RDS (Phase 3). */
+  readonly vpc?: ec2.IVpc;
+  /** Shared Lambda SG (from NetworkStack) — RDS allows ingress from it. */
+  readonly securityGroup?: ec2.ISecurityGroup;
+  /** The order database secret — the function is granted read on it. */
+  readonly databaseSecret?: secretsmanager.ISecret;
 }
 
 /**
@@ -45,13 +51,20 @@ export class ApiStack extends Stack {
       entry: path.join(REPO_ROOT, 'apps/api/src/handlers/api.ts'),
       handler: 'handler',
       description: 'cloud-commerce HTTP API (internal router)',
+      ...(props.vpc
+        ? {
+            vpc: props.vpc,
+            vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+            securityGroups: props.securityGroup ? [props.securityGroup] : undefined,
+          }
+        : {}),
       environment: {
         ...lambdaDefaults(env).environment,
         CATALOG_TABLE_NAME: props.catalogTable.tableName,
         IDEMPOTENCY_TABLE_NAME: props.idempotencyTable.tableName,
         EVENT_BUS_NAME: props.eventBus.eventBusName,
         LOG_LEVEL: env.name === 'production' ? 'info' : 'debug',
-        ...(props.databaseSecretArn ? { DATABASE_SECRET_ARN: props.databaseSecretArn } : {}),
+        ...(props.databaseSecret ? { DATABASE_SECRET_ARN: props.databaseSecret.secretArn } : {}),
       },
     });
 
@@ -59,6 +72,7 @@ export class ApiStack extends Stack {
     props.catalogTable.grantReadWriteData(this.apiFunction);
     props.idempotencyTable.grantReadWriteData(this.apiFunction);
     props.eventBus.grantPutEventsTo(this.apiFunction);
+    props.databaseSecret?.grantRead(this.apiFunction);
 
     // --- HTTP API --------------------------------------------------------
     const integration = new HttpLambdaIntegration('ApiIntegration', this.apiFunction);

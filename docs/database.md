@@ -51,19 +51,35 @@ name/category/status, so the derived GSI sort keys stay valid without a rewrite.
 
 See ADR 004.
 
-## PostgreSQL _(Phase 3)_
+## PostgreSQL — orders (Phase 3) ✅
 
-Tables: `customers`, `orders`, `order_items`, `payments`, `shipments`.
+Tables: `customers` → `orders` → `order_items` / `payments` / `shipments`.
+All foreign keys are `ON DELETE RESTRICT`; money is stored as `BIGINT` minor
+units with `CHECK (>= 0)`; status columns have `CHECK` constraints.
 
-Every index will be listed here with the exact query it serves (CLAUDE.md §5),
-e.g.:
+### Every index and the exact query it serves (CLAUDE.md §5)
 
-| Index                               | Serves                                                                  |
-| ----------------------------------- | ----------------------------------------------------------------------- |
-| `orders_customer_id_created_at_idx` | "list a customer's orders, newest first" (`GET /customers/{id}/orders`) |
-| `order_items_order_id_idx`          | load line items for an order (FK + join)                                |
-| `payments_order_id_idx`             | load payments for an order                                              |
-| `shipments_tracking_number_idx`     | carrier webhook lookup by tracking number                               |
+| Index                                          | Serves                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------- |
+| `customers_email_key` (unique, `lower(email)`) | register / look up a customer by email                                  |
+| `customers_auth_subject_key` (unique, partial) | resolve the customer for an authenticated request                       |
+| `orders_customer_id_created_at_idx`            | "list a customer's orders, newest first" (`GET /customers/{id}/orders`) |
+| `orders_idempotency_key_key` (unique, partial) | one order per `Idempotency-Key` (ADR 004)                               |
+| `orders_status_created_at_idx`                 | ops queue view "all orders in status X"                                 |
+| `order_items_order_id_idx`                     | load an order's line items (FK join, `GET /orders/{id}`)                |
+| `order_items_product_id_idx`                   | "which orders contain product X" (recall tooling)                       |
+| `payments_order_id_idx`                        | load payments for an order                                              |
+| `payments_provider_ref_key` (unique, partial)  | payment-provider webhook reconciliation                                 |
+| `shipments_order_id_idx`                       | load shipments for an order                                             |
+| `shipments_tracking_number_idx` (partial)      | carrier webhook lookup by tracking number                               |
 
-Migrations live in `packages/database/migrations/` and run via
-`pnpm --filter @cloud-commerce/database migrate:up`.
+### Transactionality
+
+`PostgresOrderRepository.create` writes the order, its items, the initial
+payment, and the initial shipment inside a single `BEGIN`/`COMMIT`
+(`withTransaction`). A crash mid-write rolls the whole thing back — a partial
+order is never observable.
+
+Migrations live in `packages/database/src/postgres/migrations/` (SQL, run with
+`node-pg-migrate`) — `pnpm --filter @cloud-commerce/database migrate:up`
+(`DATABASE_URL` must be set). They are forward-only in production.
