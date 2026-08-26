@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-eventbridge": "^3.614.0",
+    "@aws-sdk/client-sqs": "^3.614.0",
     "@cloud-commerce/domain": "workspace:*",
     "@cloud-commerce/logging": "workspace:*"
   }

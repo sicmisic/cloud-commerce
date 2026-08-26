@@ -9,6 +9,7 @@ import { MonitoringStack } from '../stacks/monitoring';
 import { NetworkStack } from '../stacks/network';
 import { RdsStack } from '../stacks/rds';
 import { StorageStack } from '../stacks/storage';
+import { WorkersStack } from '../stacks/workers';
 
 const app = new App();
 
@@ -37,6 +38,20 @@ const api = new ApiStack(app, `Api-${envConfig.name}`, {
   eventBus: messaging.eventBus,
   vpc: network.vpc,
   securityGroup: network.lambdaSecurityGroup,
+  databaseSecret: rds.secret,
+  deadLetterQueues: messaging.workQueues.map((w) => w.dlq),
+  dlqConfigJson: messaging.dlqConfigJson(),
+});
+
+new WorkersStack(app, `Workers-${envConfig.name}`, {
+  env,
+  envConfig,
+  vpc: network.vpc,
+  securityGroup: network.lambdaSecurityGroup,
+  workQueues: messaging.workQueues,
+  eventBus: messaging.eventBus,
+  catalogTable: database.catalogTable,
+  idempotencyTable: database.idempotencyTable,
   databaseSecret: rds.secret,
 });
 

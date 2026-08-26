@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import { DependencyFailureError } from '@cloud-commerce/domain';
+import {
+  DependencyFailureError,
+  type EmailProvider,
+  type EmailMessage,
+  type EmailReceipt,
+} from '@cloud-commerce/domain';
 import { logger } from '@cloud-commerce/logging';
 
 import { simulate, SimulatedProviderError, type SimulationConfig } from '../shared/simulate';
-
-import { type EmailProvider, type EmailMessage, type EmailReceipt } from './provider';
 
 const log = logger('MockEmailProvider');
 

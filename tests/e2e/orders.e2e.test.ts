@@ -8,6 +8,7 @@ import {
   CatalogService,
   CustomerService,
   InMemoryCustomerRepository,
+  InMemoryIdempotencyStore,
   InMemoryOrderRepository,
   InMemoryProductRepository,
   OrderService,
@@ -72,6 +73,7 @@ describe('E2E: order flow', () => {
       productRepository: products,
       customerRepository: customers,
       orderRepository: orders,
+      idempotencyStore: new InMemoryIdempotencyStore(),
       catalogService: catalog,
       customerService: new CustomerService(customers),
       orderService: new OrderService({

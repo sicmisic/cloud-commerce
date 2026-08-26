@@ -61,9 +61,12 @@ persist order+items+payment+shipment in one Postgres transaction → publish
 `OrderCreated` + `PaymentRequested`. Out-of-stock returns
 `409 insufficient-inventory`; an unregistered caller returns `409`.
 
-### Phase 4 — admin _(planned)_
+### Phase 4 — admin (dead-letter queues) ✅
 
-| Method | Path                              | Auth       | Description            |
-| ------ | --------------------------------- | ---------- | ---------------------- |
-| `GET`  | `/admin/failed-events`            | OPERATIONS | List DLQ messages      |
-| `POST` | `/admin/failed-events/{id}/retry` | OPERATIONS | Re-drive a DLQ message |
+| Method | Path                                        | Auth                        | Description                                                                     |
+| ------ | ------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------- |
+| `GET`  | `/admin/failed-events`                      | `admin:failed-events:read`  | Depth + a non-destructive sample of each DLQ (payment/email/shipping/inventory) |
+| `POST` | `/admin/failed-events/{queue}/retry`        | `admin:failed-events:retry` | Start an SQS message-move task re-driving that DLQ to its source queue (`202`)  |
+| `GET`  | `/admin/failed-events/{queue}/retry-status` | `admin:failed-events:read`  | Status of recent redrive tasks for that DLQ                                     |
+
+`{queue}` is one of `payment`, `email`, `shipping`, `inventory`.

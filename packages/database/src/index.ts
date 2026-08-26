@@ -12,6 +12,7 @@ export {
   type DynamoProductRepositoryOptions,
 } from './dynamo/product-repository';
 export * as productKeys from './dynamo/product-keys';
+export { DynamoIdempotencyStore } from './dynamo/idempotency-store';
 
 export { getPool, withTransaction, closePool } from './postgres/pool';
 export { PostgresCustomerRepository } from './postgres/customer-repository';

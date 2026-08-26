@@ -1,4 +1,4 @@
-import { type Money } from '@cloud-commerce/domain';
+import { type Money } from '../shared/money';
 
 /**
  * Payment provider port. The application/order service depends on this, never on
@@ -17,11 +17,11 @@ export interface PaymentChargeRequest {
   readonly correlationId: string;
 }
 
-export type PaymentStatus = 'authorized' | 'captured' | 'declined';
+export type ProviderPaymentStatus = 'authorized' | 'captured' | 'declined';
 
 export interface PaymentResult {
   readonly providerPaymentId: string;
-  readonly status: PaymentStatus;
+  readonly status: ProviderPaymentStatus;
   readonly amount: Money;
   /** Present when `status === 'declined'`. */
   readonly declineReason?: string;

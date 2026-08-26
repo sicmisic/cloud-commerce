@@ -28,6 +28,36 @@ export interface PaymentRequestedPayload {
   amount: Money;
 }
 
+export interface PaymentCompletedPayload {
+  orderId: string;
+  paymentId: string;
+  customerId: string;
+  amount: Money;
+  providerPaymentId: string;
+}
+
+export interface PaymentFailedPayload {
+  orderId: string;
+  paymentId: string;
+  customerId: string;
+  reason: string;
+  retryable: boolean;
+}
+
+export interface ShipmentDispatchedPayload {
+  orderId: string;
+  shipmentId: string;
+  customerId: string;
+  carrier: string;
+  trackingNumber: string;
+  estimatedDeliveryDate: string;
+}
+
+export interface CustomerRef {
+  orderId: string;
+  customerId: string;
+}
+
 export function orderCreatedEvent(
   order: Order,
   correlationId: string,
@@ -80,5 +110,41 @@ export function orderCancelledEvent(
       reason,
       releasedLines: order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
     },
+  });
+}
+
+export function paymentCompletedEvent(
+  payload: PaymentCompletedPayload,
+  correlationId: string,
+): DomainEvent<'PaymentCompleted', PaymentCompletedPayload> {
+  return makeEvent({
+    name: 'PaymentCompleted',
+    correlationId,
+    subject: `order/${payload.orderId}`,
+    payload,
+  });
+}
+
+export function paymentFailedEvent(
+  payload: PaymentFailedPayload,
+  correlationId: string,
+): DomainEvent<'PaymentFailed', PaymentFailedPayload> {
+  return makeEvent({
+    name: 'PaymentFailed',
+    correlationId,
+    subject: `order/${payload.orderId}`,
+    payload,
+  });
+}
+
+export function shipmentDispatchedEvent(
+  payload: ShipmentDispatchedPayload,
+  correlationId: string,
+): DomainEvent<'ShipmentDispatched', ShipmentDispatchedPayload> {
+  return makeEvent({
+    name: 'ShipmentDispatched',
+    correlationId,
+    subject: `order/${payload.orderId}`,
+    payload,
   });
 }

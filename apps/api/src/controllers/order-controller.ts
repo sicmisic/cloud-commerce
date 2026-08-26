@@ -1,8 +1,11 @@
 import { requirePermission, type Principal } from '@cloud-commerce/auth';
+import { getConfig } from '@cloud-commerce/config';
 import {
   ConflictError,
   ForbiddenError,
+  IdempotencyConflictError,
   format as formatMoney,
+  stableHash,
   type OrderView,
 } from '@cloud-commerce/domain';
 import {
@@ -12,9 +15,9 @@ import {
   ValidationFailure,
 } from '@cloud-commerce/validation';
 
-import { getCustomerService, getOrderService } from '../container';
+import { getCustomerService, getIdempotencyStore, getOrderService } from '../container';
 import { accepted, created, ok } from '../http/response';
-import { type HttpRequest } from '../http/types';
+import { type HttpRequest, type HttpResponse } from '../http/types';
 import { requireAuth } from '../middleware/auth';
 
 /**
@@ -23,7 +26,7 @@ import { requireAuth } from '../middleware/auth';
  * (inventory reservation, persistence, event fan-out) lives in the service.
  */
 export class OrderController {
-  async create(req: HttpRequest) {
+  async create(req: HttpRequest): Promise<HttpResponse> {
     const principal = requireAuth(req);
     requirePermission(principal, 'order:create');
 
@@ -38,15 +41,48 @@ export class OrderController {
 
     const customer = await this.resolveCustomer(principal);
 
-    const order = await getOrderService().createOrder({
-      customerId: customer.id,
-      correlationId: req.context.correlationId,
+    // HTTP-layer idempotency (ADR 004): the first request does the work; a
+    // retry with the same body replays the stored response; a retry with a
+    // different body is a 409.
+    const store = getIdempotencyStore();
+    const requestHash = stableHash({ customerId: customer.id, ...body });
+    const claim = await store.claim(
       idempotencyKey,
-      lines: body.lines,
-      shippingAddress: body.shippingAddress,
-      billingAddress: body.billingAddress ?? body.shippingAddress,
-    });
-    return created(toResponse(order), `/orders/${order.id}`);
+      requestHash,
+      getConfig().dynamodb.idempotencyTtlSeconds,
+    );
+
+    if (claim.outcome === 'mismatch') throw new IdempotencyConflictError(idempotencyKey);
+    if (claim.outcome === 'completed') {
+      return created(
+        claim.record.response,
+        `/orders/${(claim.record.response as { id: string }).id}`,
+      );
+    }
+    if (claim.outcome === 'in_progress') {
+      throw new ConflictError('a request with this Idempotency-Key is still being processed', {
+        idempotencyKey,
+        retryAfterSeconds: 2,
+      });
+    }
+
+    try {
+      const order = await getOrderService().createOrder({
+        customerId: customer.id,
+        correlationId: req.context.correlationId,
+        idempotencyKey,
+        lines: body.lines,
+        shippingAddress: body.shippingAddress,
+        billingAddress: body.billingAddress ?? body.shippingAddress,
+      });
+      const response = toResponse(order);
+      await store.complete(idempotencyKey, response);
+      return created(response, `/orders/${order.id}`);
+    } catch (err) {
+      // Recoverable failure — release the claim so a retry can proceed.
+      await store.release(idempotencyKey).catch(() => undefined);
+      throw err;
+    }
   }
 
   async getById(req: HttpRequest) {

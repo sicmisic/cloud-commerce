@@ -1,5 +1,6 @@
 import { Router } from '../http/router';
 
+import { registerAdminRoutes } from './admin';
 import { registerHealthRoutes } from './health';
 import { registerOrderRoutes } from './orders';
 import { registerProductRoutes } from './products';
@@ -16,5 +17,6 @@ export function buildRouter(): Router {
   registerHealthRoutes(router);
   registerProductRoutes(router);
   registerOrderRoutes(router);
+  registerAdminRoutes(router);
   return router;
 }

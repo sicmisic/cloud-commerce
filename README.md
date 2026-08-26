@@ -57,7 +57,7 @@ flowchart LR
 | CloudWatch EMF metrics + RFC7807 error responses                   | ✅ Phase 1 |
 | Product catalog CRUD, filtering, pagination, inventory reservation | ✅ Phase 2 |
 | Orders: customers / orders / items / payments / shipments          | ✅ Phase 3 |
-| Async processing: EventBridge, SQS workers, DLQs, idempotency      | 🔜 Phase 4 |
+| Async processing: EventBridge, SQS workers, DLQs, idempotency      | ✅ Phase 4 |
 | Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | 🔜 Phase 5 |
 | Alarms, dashboards, deliberate failure scenario + runbook          | 🔜 Phase 6 |
 | OpenAPI spec, E2E/perf tests, storefront UI                        | 🔜 Phase 7 |
@@ -219,6 +219,7 @@ via OIDC).
 - [003 — EventBridge + SQS for order processing](docs/adr/003-event-driven-processing.md)
 - [004 — Idempotency keys](docs/adr/004-idempotency.md)
 - [005 — One API Lambda with an internal router](docs/adr/005-single-api-lambda.md)
+- [006 — Provider ports in the domain; a `fulfillment` module](docs/adr/006-ports-and-fulfillment-module.md)
 
 ## Performance Considerations
 
@@ -246,8 +247,8 @@ Tracked as they are deferred:
 | 1     | Foundation: monorepo, TS project refs, ESLint/Prettier, base packages (config, logging, validation, domain), CDK skeleton (5 stacks), one Lambda + HTTP API route end to end, GitHub Actions CI | ✅ done |
 | 2     | Catalog: Product CRUD on DynamoDB, access-pattern-driven keys, Zod validation, pagination, filtering, inventory reservation, unit + integration tests                                           | ✅ done |
 | 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ✅ done |
-| 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ⬜ next |
-| 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ⬜      |
+| 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ✅ done |
+| 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ⬜ next |
 | 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ⬜      |
 | 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ⬜      |
 
@@ -321,3 +322,34 @@ Phase 4 — Phase 3 relies on the `orders.idempotency_key` unique index as the
 safety net and the service's replay check. Payment capture / email / shipping
 are just events + rows now; their workers are Phase 4. RDS Proxy for connection
 pooling is a documented Future Improvement.
+
+### Phase 4 — what was built / what is deferred
+
+**Built:** `domain/shared/idempotency` — `IdempotencyStore` port + in-memory
+double; `database` — `DynamoIdempotencyStore` (conditional-put claim, TTL,
+`claimed`/`completed`/`in_progress`/`mismatch`). `domain/ports` — the provider
+interfaces moved here ([ADR 006](docs/adr/006-ports-and-fulfillment-module.md));
+`integrations` is now implementations only. `domain/fulfillment` — the four
+worker application services: **PaymentProcessor** (charge → confirm order →
+`PaymentCompleted`; decline → `PaymentFailed` + ack; transient → rethrow for
+SQS retry → DLQ), **ShipmentProcessor** (label → `processing` →
+`ShipmentDispatched`), **NotificationSender** (template email per event),
+**InventoryReleaser** (compensating release on `OrderCancelled`) — each
+idempotent via the store. `apps/workers` — `createEventWorker` runtime
+(EventBridge-envelope unwrap, correlation scope, **partial batch failure**
+response), a worker container, and the 4 thin handlers. `apps/api` —
+HTTP-layer idempotency wired into `POST /orders` (claim → replay → 409 on
+mismatch), `AdminController` + `/admin/failed-events` routes. `events` —
+`DlqAdmin` (depth + sample per DLQ; native SQS message-move redrive) behind a
+`DlqAdminPort`. Infra — `MessagingStack` now creates the 4 SQS queues + DLQs
+(`maxReceiveCount: 5`, 180 s visibility) + EventBridge rules; `WorkersStack`
+adds one VPC Lambda per queue with `reportBatchItemFailures` and per-worker
+least-privilege grants. Tests — PaymentProcessor unit (4), event-worker unit
+(4), the **full fulfillment pipeline E2E** (5: happy path, decline, transient →
+DLQ, idempotent replay, cancel), admin E2E (3). 93 pass / 12 skip.
+
+**Deferred:** payment method tokenisation (a placeholder token is used now —
+Phase 5); `fulfilled` transition (carrier delivery webhook — out of scope);
+a transactional outbox for guaranteed event publication (currently a failed
+publish after a persisted order is logged, not lost-safe) — a documented Future
+Improvement.

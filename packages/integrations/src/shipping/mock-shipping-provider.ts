@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import { DependencyFailureError } from '@cloud-commerce/domain';
+import {
+  DependencyFailureError,
+  type ShippingProvider,
+  type ShipmentRequest,
+  type ShipmentLabel,
+} from '@cloud-commerce/domain';
 import { logger } from '@cloud-commerce/logging';
 
 import { simulate, SimulatedProviderError, type SimulationConfig } from '../shared/simulate';
-
-import { type ShippingProvider, type ShipmentRequest, type ShipmentLabel } from './provider';
 
 const log = logger('MockShippingProvider');
 

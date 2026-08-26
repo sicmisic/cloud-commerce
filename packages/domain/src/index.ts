@@ -10,6 +10,8 @@
  *   - order      (Phase 3)
  */
 export * from './shared';
+export * from './ports';
 export * from './product';
 export * from './customer';
 export * from './order';
+export * from './fulfillment';

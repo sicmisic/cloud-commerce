@@ -10,7 +10,7 @@
     "@aws-cdk/aws-iam:minimizePolicies": true,
     "@aws-cdk/core:validateSnapshotRemovalPolicy": true,
     "@aws-cdk/core:validateAgainstDefaultRules": true,
-    "@aws-cdk/core:defaultCrossStackReferences": "both",
+    "@aws-cdk/core:defaultCrossStackReferences": "weak",
     "@aws-cdk/aws-apigateway:disableCloudWatchRole": true,
     "@aws-cdk/core:target-partitions": ["aws"]
   }

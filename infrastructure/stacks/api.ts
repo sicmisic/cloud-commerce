@@ -9,6 +9,7 @@ import type * as events from 'aws-cdk-lib/aws-events';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import type * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import type * as sqs from 'aws-cdk-lib/aws-sqs';
 import { type Construct } from 'constructs';
 
 import { type EnvConfig } from '../config/environments';
@@ -26,6 +27,10 @@ export interface ApiStackProps extends StackProps {
   readonly securityGroup?: ec2.ISecurityGroup;
   /** The order database secret — the function is granted read on it. */
   readonly databaseSecret?: secretsmanager.ISecret;
+  /** DLQs for the admin failed-events endpoints (Phase 4). */
+  readonly deadLetterQueues?: sqs.IQueue[];
+  /** JSON for the `DLQ_QUEUES` env var. */
+  readonly dlqConfigJson?: string;
 }
 
 /**
@@ -65,6 +70,7 @@ export class ApiStack extends Stack {
         EVENT_BUS_NAME: props.eventBus.eventBusName,
         LOG_LEVEL: env.name === 'production' ? 'info' : 'debug',
         ...(props.databaseSecret ? { DATABASE_SECRET_ARN: props.databaseSecret.secretArn } : {}),
+        ...(props.dlqConfigJson ? { DLQ_QUEUES: props.dlqConfigJson } : {}),
       },
     });
 
@@ -73,6 +79,17 @@ export class ApiStack extends Stack {
     props.idempotencyTable.grantReadWriteData(this.apiFunction);
     props.eventBus.grantPutEventsTo(this.apiFunction);
     props.databaseSecret?.grantRead(this.apiFunction);
+
+    // Admin failed-events: peek the DLQs and start a redrive back to source.
+    for (const dlq of props.deadLetterQueues ?? []) {
+      dlq.grant(
+        this.apiFunction,
+        'sqs:GetQueueAttributes',
+        'sqs:ReceiveMessage',
+        'sqs:StartMessageMoveTask',
+        'sqs:ListMessageMoveTasks',
+      );
+    }
 
     // --- HTTP API --------------------------------------------------------
     const integration = new HttpLambdaIntegration('ApiIntegration', this.apiFunction);

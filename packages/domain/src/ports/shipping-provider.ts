@@ -1,17 +1,12 @@
+import { type Address } from '../order/order';
+
 /**
  * Shipping provider port (label purchase + tracking). Implementations:
- * {@link MockShippingProvider} and a future `EasyPostShippingProvider`.
+ * `MockShippingProvider` and a future `EasyPostShippingProvider`.
+ *
+ * Reuses the domain {@link Address} type so the order's shipping address flows
+ * straight through.
  */
-
-export interface Address {
-  readonly name: string;
-  readonly line1: string;
-  readonly line2?: string;
-  readonly city: string;
-  readonly region: string;
-  readonly postalCode: string;
-  readonly country: string;
-}
 
 export interface ShipmentRequest {
   readonly idempotencyKey: string;

@@ -1,5 +1,6 @@
 import { getConfig } from '@cloud-commerce/config';
 import {
+  DynamoIdempotencyStore,
   DynamoProductRepository,
   PostgresCustomerRepository,
   PostgresOrderRepository,
@@ -10,10 +11,16 @@ import {
   OrderService,
   type CustomerRepository,
   type EventPublisher,
+  type IdempotencyStore,
   type OrderRepository,
   type ProductRepository,
 } from '@cloud-commerce/domain';
-import { EventBridgeEventPublisher, InMemoryEventPublisher } from '@cloud-commerce/events';
+import {
+  DlqAdmin,
+  type DlqAdminPort,
+  EventBridgeEventPublisher,
+  InMemoryEventPublisher,
+} from '@cloud-commerce/events';
 import { logger } from '@cloud-commerce/logging';
 
 /**
@@ -27,9 +34,11 @@ interface Container {
   customerRepository?: CustomerRepository;
   orderRepository?: OrderRepository;
   eventPublisher?: EventPublisher;
+  idempotencyStore?: IdempotencyStore;
   catalogService?: CatalogService;
   customerService?: CustomerService;
   orderService?: OrderService;
+  dlqAdmin?: DlqAdminPort;
 }
 
 const c: Container = {};
@@ -57,6 +66,22 @@ export function getEventPublisher(): EventPublisher {
     c.eventPublisher = new EventBridgeEventPublisher({ eventBusName: messaging.eventBusName });
   }
   return c.eventPublisher;
+}
+
+export function getIdempotencyStore(): IdempotencyStore {
+  c.idempotencyStore ??= new DynamoIdempotencyStore(getConfig().dynamodb.idempotencyTableName);
+  return c.idempotencyStore;
+}
+
+export function getDlqAdmin(): DlqAdminPort {
+  c.dlqAdmin ??= new DlqAdmin(
+    getConfig().messaging.dlqQueues.map((q) => ({
+      name: q.name,
+      dlqUrl: q.dlqUrl,
+      dlqArn: q.dlqArn,
+    })),
+  );
+  return c.dlqAdmin;
 }
 
 export function getCatalogService(): CatalogService {

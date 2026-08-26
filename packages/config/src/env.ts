@@ -44,6 +44,23 @@ export const envSchema = z.object({
   EMAIL_QUEUE_URL: z.string().url().optional(),
   SHIPPING_QUEUE_URL: z.string().url().optional(),
   INVENTORY_QUEUE_URL: z.string().url().optional(),
+  /**
+   * JSON array of `{ name, dlqUrl, dlqArn }` for the admin failed-events
+   * endpoints. Injected by the messaging stack.
+   */
+  DLQ_QUEUES: z
+    .string()
+    .default('[]')
+    .transform((raw, ctx) => {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) throw new Error('not an array');
+        return parsed as { name: string; dlqUrl: string; dlqArn: string }[];
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'DLQ_QUEUES must be a JSON array' });
+        return z.NEVER;
+      }
+    }),
 
   // --- Auth (Cognito) -----------------------------------------------------
   COGNITO_USER_POOL_ID: z.string().optional(),

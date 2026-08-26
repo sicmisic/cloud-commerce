@@ -38,6 +38,7 @@ export interface AppConfig {
     readonly emailQueueUrl?: string;
     readonly shippingQueueUrl?: string;
     readonly inventoryQueueUrl?: string;
+    readonly dlqQueues: { name: string; dlqUrl: string; dlqArn: string }[];
   };
   readonly auth: {
     readonly userPoolId?: string;
@@ -82,6 +83,7 @@ function shape(env: Env): AppConfig {
       emailQueueUrl: env.EMAIL_QUEUE_URL,
       shippingQueueUrl: env.SHIPPING_QUEUE_URL,
       inventoryQueueUrl: env.INVENTORY_QUEUE_URL,
+      dlqQueues: env.DLQ_QUEUES,
     },
     auth: {
       userPoolId: env.COGNITO_USER_POOL_ID,

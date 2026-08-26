@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
 
-import { PaymentDeclinedError, DependencyFailureError } from '@cloud-commerce/domain';
-import { logger } from '@cloud-commerce/logging';
-
-import { simulate, SimulatedProviderError, type SimulationConfig } from '../shared/simulate';
-
 import {
+  PaymentDeclinedError,
+  DependencyFailureError,
   type PaymentProvider,
   type PaymentChargeRequest,
   type PaymentResult,
   type RefundRequest,
   type RefundResult,
-} from './provider';
+} from '@cloud-commerce/domain';
+import { logger } from '@cloud-commerce/logging';
+
+import { simulate, SimulatedProviderError, type SimulationConfig } from '../shared/simulate';
 
 const log = logger('MockPaymentProvider');
 
