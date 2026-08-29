@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { Stack, type StackProps, CfnOutput, Duration } from 'aws-cdk-lib';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import type * as cognito from 'aws-cdk-lib/aws-cognito';
 import type * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import type * as events from 'aws-cdk-lib/aws-events';
@@ -31,6 +32,11 @@ export interface ApiStackProps extends StackProps {
   readonly deadLetterQueues?: sqs.IQueue[];
   /** JSON for the `DLQ_QUEUES` env var. */
   readonly dlqConfigJson?: string;
+  /** Cognito user pool + client for JWT verification (Phase 5). */
+  readonly userPool?: cognito.IUserPool;
+  readonly userPoolClient?: cognito.IUserPoolClient;
+  /** Provider API-key secrets the API is granted read on (Phase 5). */
+  readonly providerSecrets?: secretsmanager.ISecret[];
 }
 
 /**
@@ -71,6 +77,18 @@ export class ApiStack extends Stack {
         LOG_LEVEL: env.name === 'production' ? 'info' : 'debug',
         ...(props.databaseSecret ? { DATABASE_SECRET_ARN: props.databaseSecret.secretArn } : {}),
         ...(props.dlqConfigJson ? { DLQ_QUEUES: props.dlqConfigJson } : {}),
+        ...(props.userPool ? { COGNITO_USER_POOL_ID: props.userPool.userPoolId } : {}),
+        ...(props.userPoolClient
+          ? { COGNITO_CLIENT_ID: props.userPoolClient.userPoolClientId }
+          : {}),
+        ...(props.providerSecrets?.[0]
+          ? { PAYMENT_SECRET_ARN: props.providerSecrets[0].secretArn }
+          : {}),
+        ...(props.providerSecrets?.[1]
+          ? { SHIPPING_SECRET_ARN: props.providerSecrets[1].secretArn }
+          : {}),
+        // Debug claims are a local-dev affordance only — never in a deployed env.
+        AUTH_ALLOW_DEBUG_CLAIMS: 'false',
       },
     });
 
@@ -79,6 +97,7 @@ export class ApiStack extends Stack {
     props.idempotencyTable.grantReadWriteData(this.apiFunction);
     props.eventBus.grantPutEventsTo(this.apiFunction);
     props.databaseSecret?.grantRead(this.apiFunction);
+    for (const secret of props.providerSecrets ?? []) secret.grantRead(this.apiFunction);
 
     // Admin failed-events: peek the DLQs and start a redrive back to source.
     for (const dlq of props.deadLetterQueues ?? []) {

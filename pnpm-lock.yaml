@@ -75,6 +75,9 @@ importers:
 
   apps/workers:
     dependencies:
+      '@aws-sdk/client-cognito-identity-provider':
+        specifier: ^3.614.0
+        version: 3.1124.0
       '@cloud-commerce/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -285,6 +288,10 @@ packages:
     bundledDependencies:
       - jsonschema
       - semver
+
+  '@aws-sdk/client-cognito-identity-provider@3.1124.0':
+    resolution: {integrity: sha512-fc3W6vCNmhSjXRZ9Awd4Otz1od+/xtlh2YYQnjVPF2suDdLGq3fS9bj+vzUHPedboNQwR03HEsSlgfIHTQon0A==}
+    engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-dynamodb@3.1124.0':
     resolution: {integrity: sha512-SRINKKaG79aG3q/6etfXux9q1KH3TLu9UzCoCuChC34zWpcH5ZEcHbA8/LhDxZEqcEJAp0sRIkkQZeCppqD/DA==}
@@ -2515,6 +2522,17 @@ snapshots:
   '@aws-cdk/asset-node-proxy-agent-v6@2.1.2': {}
 
   '@aws-cdk/cloud-assembly-schema@54.21.0': {}
+
+  '@aws-sdk/client-cognito-identity-provider@3.1124.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.9
+      '@aws-sdk/credential-provider-node': 3.972.82
+      '@aws-sdk/types': 3.974.5
+      '@smithy/core': 3.33.3
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.12.0
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
 
   '@aws-sdk/client-dynamodb@3.1124.0':
     dependencies:

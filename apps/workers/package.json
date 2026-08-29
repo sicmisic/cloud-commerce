@@ -9,6 +9,7 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.614.0",
     "@cloud-commerce/config": "workspace:*",
     "@cloud-commerce/database": "workspace:*",
     "@cloud-commerce/domain": "workspace:*",

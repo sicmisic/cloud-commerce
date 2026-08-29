@@ -45,6 +45,9 @@ export class NetworkStack extends Stack {
       ['EventBridge', ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE],
       ['Sqs', ec2.InterfaceVpcEndpointAwsService.SQS],
       ['CloudWatchLogs', ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS],
+      // User-pool JWKS + admin APIs (`cognito-idp`), for JWT verification and
+      // the post-confirmation trigger, from inside the VPC.
+      ['CognitoIdp', new ec2.InterfaceVpcEndpointAwsService('cognito-idp')],
     ] as const) {
       this.vpc.addInterfaceEndpoint(`${name}Endpoint`, {
         service,

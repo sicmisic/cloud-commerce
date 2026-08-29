@@ -6,6 +6,7 @@ export { handler as paymentHandler } from './payment/handler';
 export { handler as shippingHandler } from './shipping/handler';
 export { handler as emailHandler } from './email/handler';
 export { handler as inventoryHandler } from './inventory/handler';
+export { handler as postConfirmationHandler } from './auth/post-confirmation';
 
 export { createEventWorker } from './shared/event-worker';
 export {

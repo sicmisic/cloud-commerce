@@ -3,11 +3,13 @@ import { App, Tags } from 'aws-cdk-lib';
 
 import { resolveEnv } from '../config/environments';
 import { ApiStack } from '../stacks/api';
+import { AuthStack } from '../stacks/auth';
 import { DatabaseStack } from '../stacks/database';
 import { MessagingStack } from '../stacks/messaging';
 import { MonitoringStack } from '../stacks/monitoring';
 import { NetworkStack } from '../stacks/network';
 import { RdsStack } from '../stacks/rds';
+import { SecretsStack } from '../stacks/secrets';
 import { StorageStack } from '../stacks/storage';
 import { WorkersStack } from '../stacks/workers';
 
@@ -30,6 +32,17 @@ const rds = new RdsStack(app, `Rds-${envConfig.name}`, {
   appSecurityGroup: network.lambdaSecurityGroup,
 });
 
+const secrets = new SecretsStack(app, `Secrets-${envConfig.name}`, { env, envConfig });
+
+const auth = new AuthStack(app, `Auth-${envConfig.name}`, {
+  env,
+  envConfig,
+  vpc: network.vpc,
+  securityGroup: network.lambdaSecurityGroup,
+  databaseSecret: rds.secret,
+  catalogTable: database.catalogTable,
+});
+
 const api = new ApiStack(app, `Api-${envConfig.name}`, {
   env,
   envConfig,
@@ -41,6 +54,9 @@ const api = new ApiStack(app, `Api-${envConfig.name}`, {
   databaseSecret: rds.secret,
   deadLetterQueues: messaging.workQueues.map((w) => w.dlq),
   dlqConfigJson: messaging.dlqConfigJson(),
+  userPool: auth.userPool,
+  userPoolClient: auth.userPoolClient,
+  providerSecrets: [secrets.paymentProviderSecret, secrets.shippingProviderSecret],
 });
 
 new WorkersStack(app, `Workers-${envConfig.name}`, {

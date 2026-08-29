@@ -4,3 +4,4 @@ export { withErrorHandler } from './error-handler';
 export { withCors } from './cors';
 export { withRateLimit, resetRateLimiter } from './rate-limit';
 export { withAuth, requireAuth } from './auth';
+export { withAudit } from './audit';

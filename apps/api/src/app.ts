@@ -1,6 +1,7 @@
 import { type HttpRequest, type HttpResponse } from './http/types';
 import {
   compose,
+  withAudit,
   withAuth,
   withCors,
   withErrorHandler,
@@ -18,10 +19,11 @@ const router = buildRouter();
  *   3. error-handler    — maps thrown errors -> problem+json
  *   4. auth             — attaches req.principal when a credential is present
  *   5. rate-limit       — in-process guard, keyed by principal/IP
+ *   6. audit            — one structured line per state-changing request
  * then the matched route handler.
  */
 const pipeline = compose(
-  [withRequestContext, withCors, withErrorHandler, withAuth, withRateLimit],
+  [withRequestContext, withCors, withErrorHandler, withAuth, withRateLimit, withAudit],
   async (req: HttpRequest) => {
     const { handler } = router.match(req);
     return handler(req);

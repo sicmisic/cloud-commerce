@@ -58,7 +58,7 @@ flowchart LR
 | Product catalog CRUD, filtering, pagination, inventory reservation | ✅ Phase 2 |
 | Orders: customers / orders / items / payments / shipments          | ✅ Phase 3 |
 | Async processing: EventBridge, SQS workers, DLQs, idempotency      | ✅ Phase 4 |
-| Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | 🔜 Phase 5 |
+| Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | ✅ Phase 5 |
 | Alarms, dashboards, deliberate failure scenario + runbook          | 🔜 Phase 6 |
 | OpenAPI spec, E2E/perf tests, storefront UI                        | 🔜 Phase 7 |
 
@@ -248,8 +248,8 @@ Tracked as they are deferred:
 | 2     | Catalog: Product CRUD on DynamoDB, access-pattern-driven keys, Zod validation, pagination, filtering, inventory reservation, unit + integration tests                                           | ✅ done |
 | 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ✅ done |
 | 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ✅ done |
-| 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ⬜ next |
-| 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ⬜      |
+| 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ✅ done |
+| 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ⬜ next |
 | 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ⬜      |
 
 ### Phase 1 — what was built / what is deferred
@@ -353,3 +353,32 @@ Phase 5); `fulfilled` transition (carrier delivery webhook — out of scope);
 a transactional outbox for guaranteed event publication (currently a failed
 publish after a persisted order is logged, not lost-safe) — a documented Future
 Improvement.
+
+### Phase 5 — what was built / what is deferred
+
+**Built:** `AuthStack` — Cognito user pool (email sign-in, 12-char password
+policy, optional MFA in prod), a public SPA client (1 h tokens), three groups
+named for the RBAC roles (`CUSTOMER` / `OPERATIONS` / `ADMIN`), and a
+**PostConfirmation trigger** Lambda (`apps/workers/src/auth/post-confirmation.ts`)
+that adds new users to `CUSTOMER` and provisions their customer row (idempotent).
+`auth` package — `CognitoTokenVerifier` (aws-jwt-verify; validates signature,
+issuer, audience, expiry) wired into `withAuth`; when no pool is configured
+(local) it falls back to a `FakeTokenVerifier` + the `x-debug-claims` header,
+which config **hard-disables in production** and CDK sets `false` in every
+deployed env. RBAC — handlers assert on a **permission**
+(`catalog:write`, `order:read:any`, …), derived from group membership, never a
+role name. `apps/api` — new `withAudit` middleware: one structured `audit` line
+per state-changing request (actor, action, params, outcome). Least-privilege —
+every Lambda role was already scoped per resource; Phase 5 adds
+`cognito-idp:AdminAddUserToGroup` (trigger only) and `secret:GetSecretValue` on
+the provider secrets. `SecretsStack` — placeholder Secrets Manager entries for
+the payment / shipping provider keys, referenced by ARN. `NetworkStack` — a
+`cognito-idp` interface VPC endpoint so JWKS fetch + admin calls work from the
+NAT-less VPC. Tests — verifier unit (8), RBAC unit (5), audit middleware unit
+(3), auth+RBAC E2E through the handler (5). 114 pass / 12 skip.
+
+**Deferred:** a Lambda authorizer on API Gateway (verification is currently
+in-process at the router boundary — simpler, one fewer Lambda, and the internal
+router needs the principal anyway; ADR 005 covers the single-Lambda trade-off);
+fine-grained per-tenant data isolation; WAF rules (Phase 6 wires the rate-limit
+alarm; a managed WAF ACL is a Future Improvement).
