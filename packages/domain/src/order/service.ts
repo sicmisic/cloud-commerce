@@ -1,8 +1,14 @@
 import { type CustomerRepository } from '../customer/repository';
 import { type CatalogService } from '../product/service';
-import { ConflictError, NotFoundError, ValidationError } from '../shared/errors';
+import {
+  ConflictError,
+  InsufficientInventoryError,
+  NotFoundError,
+  ValidationError,
+} from '../shared/errors';
 import { type EventPublisher } from '../shared/events';
 import { type Logger, noopLogger } from '../shared/logger';
+import { BUSINESS_METRIC, type MetricsSink, noopMetrics } from '../shared/metrics';
 import { type Page, type PageRequest } from '../shared/pagination';
 
 import { orderCancelledEvent, orderCreatedEvent, paymentRequestedEvent } from './events';
@@ -26,6 +32,7 @@ export interface OrderServiceDeps {
   /** Provider name recorded on the initial payment row (mock/stripe). */
   readonly paymentProviderName: string;
   readonly logger?: Logger;
+  readonly metrics?: MetricsSink;
 }
 
 export interface CreateOrderCommand {
@@ -45,9 +52,11 @@ export interface CreateOrderCommand {
  */
 export class OrderService {
   private readonly log: Logger;
+  private readonly metrics: MetricsSink;
 
   constructor(private readonly deps: OrderServiceDeps) {
     this.log = deps.logger ?? noopLogger;
+    this.metrics = deps.metrics ?? noopMetrics;
   }
 
   async createOrder(cmd: CreateOrderCommand): Promise<OrderView> {
@@ -60,6 +69,7 @@ export class OrderService {
           { idempotencyKey: cmd.idempotencyKey, orderId: existing.id },
           'idempotent replay',
         );
+        this.metrics.increment(BUSINESS_METRIC.IdempotentReplay);
         return existing;
       }
     }
@@ -101,8 +111,13 @@ export class OrderService {
       );
 
       this.log.info({ orderId: order.id, total: order.total.amount }, 'order created');
+      this.metrics.increment(BUSINESS_METRIC.OrdersCreated);
       return { ...order, payments: [payment], shipments: [shipment] };
     } catch (err) {
+      this.metrics.increment(BUSINESS_METRIC.OrdersFailed);
+      if (err instanceof InsufficientInventoryError) {
+        this.metrics.increment(BUSINESS_METRIC.InventoryReservationFailures);
+      }
       await this.compensate(reserved);
       throw err;
     }

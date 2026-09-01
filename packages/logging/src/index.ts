@@ -9,4 +9,11 @@ export {
 
 export { getLogger, logger, resetLogger, type Logger } from './logger';
 
-export { MetricsCollector, emitMetric, METRIC, type MetricName, type MetricUnit } from './metrics';
+export {
+  MetricsCollector,
+  emitMetric,
+  METRIC,
+  emfMetricsSink,
+  type MetricName,
+  type MetricUnit,
+} from './metrics';

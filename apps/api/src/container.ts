@@ -21,7 +21,7 @@ import {
   EventBridgeEventPublisher,
   InMemoryEventPublisher,
 } from '@cloud-commerce/events';
-import { logger } from '@cloud-commerce/logging';
+import { emfMetricsSink, logger } from '@cloud-commerce/logging';
 
 /**
  * Composition root. Wires application services to their adapters based on
@@ -102,6 +102,7 @@ export function getOrderService(): OrderService {
     events: getEventPublisher(),
     paymentProviderName: getConfig().providers.payment,
     logger: logger('OrderService'),
+    metrics: emfMetricsSink,
   });
   return c.orderService;
 }

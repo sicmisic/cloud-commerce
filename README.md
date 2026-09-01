@@ -59,7 +59,7 @@ flowchart LR
 | Orders: customers / orders / items / payments / shipments          | ✅ Phase 3 |
 | Async processing: EventBridge, SQS workers, DLQs, idempotency      | ✅ Phase 4 |
 | Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | ✅ Phase 5 |
-| Alarms, dashboards, deliberate failure scenario + runbook          | 🔜 Phase 6 |
+| Alarms, dashboards, deliberate failure scenario + runbook          | ✅ Phase 6 |
 | OpenAPI spec, E2E/perf tests, storefront UI                        | 🔜 Phase 7 |
 
 ## Technology Stack
@@ -249,8 +249,8 @@ Tracked as they are deferred:
 | 3     | Orders: PostgreSQL schema + migrations + indexes, repositories, order creation service                                                                                                          | ✅ done |
 | 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ✅ done |
 | 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ✅ done |
-| 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ⬜ next |
-| 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ⬜      |
+| 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ✅ done |
+| 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ⬜ next |
 
 ### Phase 1 — what was built / what is deferred
 
@@ -380,5 +380,28 @@ NAT-less VPC. Tests — verifier unit (8), RBAC unit (5), audit middleware unit
 **Deferred:** a Lambda authorizer on API Gateway (verification is currently
 in-process at the router boundary — simpler, one fewer Lambda, and the internal
 router needs the principal anyway; ADR 005 covers the single-Lambda trade-off);
-fine-grained per-tenant data isolation; WAF rules (Phase 6 wires the rate-limit
-alarm; a managed WAF ACL is a Future Improvement).
+fine-grained per-tenant data isolation; a managed WAF ACL is a Future Improvement.
+
+### Phase 6 — what was built / what is deferred
+
+**Built:** `domain/shared/metrics` — `MetricsSink` port + `noopMetrics` +
+`BUSINESS_METRIC` names; `logging` — `emfMetricsSink` adapter. `OrderService` /
+`PaymentProcessor` now emit `OrdersCreated` / `OrdersFailed` /
+`InventoryReservationFailures` / `IdempotentReplay` / `PaymentFailures` (via the
+injected sink; the API + worker containers wire the EMF adapter). `request-context`
+middleware already emitted `LambdaDuration` / `LambdaErrors`; the worker runtime
+does the same per message. `MonitoringStack` (rewritten) — an SNS alarm topic
+(`ALARM_EMAIL` subscription) and the full alarm set the spec asks for: API
+Lambda error rate, API 5xx rate, per-queue backlog, **per-DLQ message count
+(threshold 0)**, RDS CPU + connections; plus a dashboard with Orders / Failures
+/ API latency (p50·p99) / DLQ-depth widgets. Deliberate failure scenario —
+`paymentFaultRate` CDK context → `PAYMENT_MOCK_FAILURE_RATE` on the worker
+(never armed in production); the mock payment provider then fails a controlled
+fraction of charges transiently, which flows retries → DLQ → alarm.
+`docs/troubleshooting.md` is the full alarm → correlation-id → logs → root-cause
+→ redrive runbook. Tests — business-metrics unit (3). 117 pass / 12 skip.
+
+**Deferred:** distributed tracing spans beyond X-Ray's automatic Lambda/SDK
+segments (correlation id already threads everything); anomaly-detection alarms;
+a synthetic canary hitting `/health` (the deploy pipeline's smoke test covers
+the basics).

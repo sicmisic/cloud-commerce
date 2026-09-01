@@ -23,7 +23,7 @@ import {
   MockPaymentProvider,
   MockShippingProvider,
 } from '@cloud-commerce/integrations';
-import { logger } from '@cloud-commerce/logging';
+import { emfMetricsSink, logger } from '@cloud-commerce/logging';
 
 /**
  * Worker composition root. Same idea as the API container — lazy singletons
@@ -76,6 +76,7 @@ export function paymentProcessor(): PaymentProcessor {
     idempotency: idempotency(),
     idempotencyTtlSeconds: cfg().dynamodb.idempotencyTtlSeconds,
     logger: logger('PaymentProcessor'),
+    metrics: emfMetricsSink,
   }));
 }
 

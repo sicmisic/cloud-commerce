@@ -59,7 +59,7 @@ const api = new ApiStack(app, `Api-${envConfig.name}`, {
   providerSecrets: [secrets.paymentProviderSecret, secrets.shippingProviderSecret],
 });
 
-new WorkersStack(app, `Workers-${envConfig.name}`, {
+const workers = new WorkersStack(app, `Workers-${envConfig.name}`, {
   env,
   envConfig,
   vpc: network.vpc,
@@ -69,12 +69,17 @@ new WorkersStack(app, `Workers-${envConfig.name}`, {
   catalogTable: database.catalogTable,
   idempotencyTable: database.idempotencyTable,
   databaseSecret: rds.secret,
+  paymentFaultRate: Number(app.node.tryGetContext('paymentFaultRate') ?? 0),
 });
 
 new MonitoringStack(app, `Monitoring-${envConfig.name}`, {
   env,
   envConfig,
-  apiFunctionName: api.apiFunction.functionName,
+  apiFunction: api.apiFunction,
+  httpApi: api.httpApi,
+  workerFunctions: workers.workerFunctions,
+  workQueues: messaging.workQueues,
+  rdsInstance: rds.instance,
 });
 
 // Tag everything for cost allocation and ownership.

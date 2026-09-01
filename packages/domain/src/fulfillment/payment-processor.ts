@@ -11,6 +11,7 @@ import { PaymentDeclinedError, DependencyFailureError } from '../shared/errors';
 import { type EventPublisher } from '../shared/events';
 import { type IdempotencyStore } from '../shared/idempotency';
 import { type Logger, noopLogger } from '../shared/logger';
+import { BUSINESS_METRIC, type MetricsSink, noopMetrics } from '../shared/metrics';
 
 export interface PaymentProcessorDeps {
   readonly orders: OrderRepository;
@@ -19,6 +20,7 @@ export interface PaymentProcessorDeps {
   readonly idempotency: IdempotencyStore;
   readonly idempotencyTtlSeconds?: number;
   readonly logger?: Logger;
+  readonly metrics?: MetricsSink;
 }
 
 /**
@@ -33,10 +35,12 @@ export interface PaymentProcessorDeps {
  */
 export class PaymentProcessor {
   private readonly log: Logger;
+  private readonly metrics: MetricsSink;
   private readonly ttl: number;
 
   constructor(private readonly deps: PaymentProcessorDeps) {
     this.log = deps.logger ?? noopLogger;
+    this.metrics = deps.metrics ?? noopMetrics;
     this.ttl = deps.idempotencyTtlSeconds ?? 86_400;
   }
 
@@ -110,12 +114,14 @@ export class PaymentProcessor {
         };
         await this.deps.events.publish(paymentFailedEvent(failed, correlationId));
         await this.deps.idempotency.complete(idemKey, { declined: true });
+        this.metrics.increment(BUSINESS_METRIC.PaymentFailures);
         this.log.warn({ orderId: payload.orderId }, 'payment declined');
         return; // terminal — ack the message
       }
 
       // Transient — release the claim and let SQS retry.
       await this.deps.idempotency.release(idemKey).catch(() => undefined);
+      this.metrics.increment(BUSINESS_METRIC.PaymentFailures);
       this.log.error({ err, orderId: payload.orderId }, 'payment charge failed transiently');
       throw err;
     }

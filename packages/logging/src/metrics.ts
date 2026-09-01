@@ -112,6 +112,17 @@ export class MetricsCollector {
   }
 }
 
+/**
+ * Adapter from the domain `MetricsSink` port to the EMF emitter. Each call is
+ * its own EMF line; CloudWatch aggregates them into the `CloudCommerce`
+ * namespace.
+ */
+export const emfMetricsSink = {
+  increment(name: string, value = 1): void {
+    emitMetric(name, value, 'Count');
+  },
+};
+
 /** Fire-and-forget single metric (its own EMF line). */
 export function emitMetric(
   name: MetricName | string,

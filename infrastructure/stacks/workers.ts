@@ -24,6 +24,12 @@ export interface WorkersStackProps extends StackProps {
   readonly catalogTable: dynamodb.ITable;
   readonly idempotencyTable: dynamodb.ITable;
   readonly databaseSecret: secretsmanager.ISecret;
+  /**
+   * Deliberate failure scenario (CLAUDE.md §7). `0`–`1` — the fraction of
+   * payment charges the mock provider fails transiently. Non-production only;
+   * set with `-c paymentFaultRate=0.5`. See docs/troubleshooting.md.
+   */
+  readonly paymentFaultRate?: number;
 }
 
 const HANDLER_ENTRY: Record<string, string> = {
@@ -39,6 +45,8 @@ const HANDLER_ENTRY: Record<string, string> = {
  * (CLAUDE.md §8). `reportBatchItemFailures` is on so only failed messages retry.
  */
 export class WorkersStack extends Stack {
+  readonly workerFunctions: NodejsFunction[] = [];
+
   constructor(scope: Construct, id: string, props: WorkersStackProps) {
     super(scope, id, { ...props, stackName: stackName('Workers', props.envConfig.name) });
     const env = props.envConfig;
@@ -50,7 +58,9 @@ export class WorkersStack extends Stack {
       EVENT_BUS_NAME: props.eventBus.eventBusName,
       DATABASE_SECRET_ARN: props.databaseSecret.secretArn,
       LOG_LEVEL: env.name === 'production' ? 'info' : 'debug',
-      PAYMENT_MOCK_FAILURE_RATE: env.name === 'production' ? '0' : '0',
+      // Fault injector — never armed in production regardless of the flag.
+      PAYMENT_MOCK_FAILURE_RATE:
+        env.name === 'production' ? '0' : String(props.paymentFaultRate ?? 0),
     };
 
     for (const wq of props.workQueues) {
@@ -88,6 +98,8 @@ export class WorkersStack extends Stack {
       } else if (wq.name === 'payment') {
         props.catalogTable.grantReadData(fn);
       }
+
+      this.workerFunctions.push(fn);
     }
   }
 }
