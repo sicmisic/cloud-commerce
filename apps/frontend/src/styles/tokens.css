@@ -1,0 +1,69 @@
+/*
+ * Design tokens. Single source of truth for colour, space, type, radius.
+ * Light palette on :root; dark palette swaps only the semantic tokens.
+ * Nothing outside this file should use a raw hex value.
+ */
+:root {
+  /* palette */
+  --c-bg: #fbfbfd;
+  --c-surface: #ffffff;
+  --c-surface-2: #f2f3f7;
+  --c-border: #e2e4ec;
+  --c-text: #1a1c24;
+  --c-text-muted: #5b6072;
+  --c-primary: #2f5bea;
+  --c-primary-contrast: #ffffff;
+  --c-primary-hover: #2247c4;
+  --c-success: #157a4a;
+  --c-warning: #9a6a00;
+  --c-danger: #c22a2a;
+  --c-focus: #2f5bea;
+
+  /* spacing scale (4px base) */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-8: 3rem;
+
+  /* radius */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+
+  /* type */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.9375rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: 1.75rem;
+
+  --shadow-1: 0 1px 2px rgba(20, 22, 34, 0.06), 0 2px 8px rgba(20, 22, 34, 0.05);
+  --shadow-2: 0 4px 16px rgba(20, 22, 34, 0.12);
+
+  --maxw: 1120px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #101219;
+    --c-surface: #191c26;
+    --c-surface-2: #21252f;
+    --c-border: #2f333f;
+    --c-text: #eceef4;
+    --c-text-muted: #a0a5b6;
+    --c-primary: #6d8dff;
+    --c-primary-contrast: #0c1020;
+    --c-primary-hover: #849dff;
+    --c-success: #4cc38a;
+    --c-warning: #d9a441;
+    --c-danger: #f0736b;
+    --c-focus: #6d8dff;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+}

@@ -58,14 +58,23 @@ HTTP handler  ──►  Controller  ──►  Application service  ──►  
   framework-neutral request, run the pipeline, and adapt the response.
 - **Controllers** (`apps/api/src/controllers`) parse + validate input (Zod),
   call one application service method, and format the result. No business logic.
-- **Application services** (`packages/domain/<aggregate>/service.ts`) implement
-  use cases. They depend on **ports** (`OrderRepository`, `EventPublisher`,
-  `PaymentProvider`) — interfaces, never concrete AWS SDK calls — so they are
-  unit-testable with in-memory doubles.
-- **Domain** (`packages/domain/<aggregate>`) is pure: entities, value objects
-  (`Money`), domain errors, no I/O, no framework imports.
-- **Adapters** live in `packages/database`, `packages/events`,
-  `packages/integrations` and implement the ports.
+- **Application services** implement use cases and depend only on **ports**
+  (interfaces, never concrete AWS SDK calls) so they are unit-testable with
+  in-memory doubles:
+  - HTTP-side: `CatalogService`, `CustomerService`, `OrderService`
+    (`packages/domain/<aggregate>/service.ts`).
+  - Worker-side: `PaymentProcessor`, `ShipmentProcessor`, `NotificationSender`,
+    `InventoryReleaser` (`packages/domain/fulfillment/`).
+- **Ports** live in `packages/domain`: repository ports per aggregate,
+  `EventPublisher`, `IdempotencyStore`, `MetricsSink`, `Logger`, and the
+  external-provider ports (`PaymentProvider` / `ShippingProvider` /
+  `EmailProvider`) — moved here in [ADR 006](adr/006-ports-and-fulfillment-module.md).
+- **Domain** (`packages/domain/<aggregate>`) is otherwise pure: entities, value
+  objects (`Money`), an `Order` state machine, domain errors — no I/O, no
+  framework imports.
+- **Adapters** live in `packages/database` (DynamoDB + Postgres repos, idempotency
+  store, Secrets Manager), `packages/events` (EventBridge publisher, `DlqAdmin`),
+  `packages/integrations` (`Mock*` providers), `packages/auth` (Cognito JWT).
 
 > Note: application services are co-located with their aggregate in
 > `packages/domain` as a cohesive module (`entity.ts` = pure domain,
@@ -113,7 +122,26 @@ HTTP handler  ──►  Controller  ──►  Application service  ──►  
 | EventBridge      | domain events                                       | producer/consumer decoupling, filtering, replay                  |
 | SQS (+DLQ)       | per-worker work queues                              | durable at-least-once delivery, retry, back-pressure             |
 
-## 6. Build phases
+## 6. Infrastructure (AWS CDK)
 
-See `README.md` §Build Status. Each phase ships code + tests + docs before the
-next begins.
+Ten stacks, one concern each, wired in `infrastructure/bin/app.ts`:
+
+| Stack        | Contents                                                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Network`    | VPC (2 AZ, **no NAT**), gateway endpoints (S3, DynamoDB), interface endpoints (Secrets Manager, EventBridge, SQS, CloudWatch Logs, cognito-idp), shared Lambda SG |
+| `Storage`    | S3 buckets — product images, reports, log archive (private, encrypted, versioned)                                                                                 |
+| `Database`   | DynamoDB `catalog` (GSI1 category / GSI2 sku / GSI3 status) + `idempotency` (TTL)                                                                                 |
+| `Rds`        | PostgreSQL 16, generated-secret credentials, isolated subnets, scoped SG                                                                                          |
+| `Secrets`    | placeholder provider-key secrets (payment, shipping)                                                                                                              |
+| `Messaging`  | EventBridge bus + 30-day archive; 4 SQS queues + DLQs; routing rules                                                                                              |
+| `Auth`       | Cognito user pool, SPA client, 3 groups, PostConfirmation trigger                                                                                                 |
+| `Api`        | one Node 22 Lambda (in the VPC) behind an HTTP API; least-privilege grants                                                                                        |
+| `Workers`    | one Lambda per queue, `reportBatchItemFailures`, per-worker grants                                                                                                |
+| `Monitoring` | SNS alarm topic, the full alarm set, a CloudWatch dashboard                                                                                                       |
+
+`cdk synth` produces all ten cleanly with `validateAgainstDefaultRules` on.
+
+## 7. Build phases
+
+See `README.md` §Build Status. Each phase shipped code + tests + docs before the
+next began.

@@ -25,11 +25,24 @@ ENV=staging pnpm --filter @cloud-commerce/infrastructure exec cdk diff
 
 Stacks (deploy order is resolved automatically by CDK dependencies):
 
-1. `Storage-<env>` — S3 buckets
-2. `Database-<env>` — DynamoDB tables (RDS added Phase 3)
-3. `Messaging-<env>` — EventBridge bus (SQS queues added Phase 4)
-4. `Api-<env>` — Lambda + HTTP API
-5. `Monitoring-<env>` — dashboard (alarms added Phase 6)
+1. `Network-<env>` — VPC, VPC endpoints, shared Lambda SG
+2. `Storage-<env>` — S3 buckets
+3. `Database-<env>` — DynamoDB catalog + idempotency tables
+4. `Rds-<env>` — PostgreSQL 16 (generated-secret credentials)
+5. `Secrets-<env>` — provider API-key secrets (placeholders)
+6. `Messaging-<env>` — EventBridge bus + SQS queues + DLQs + rules
+7. `Auth-<env>` — Cognito user pool, client, groups, PostConfirmation trigger
+8. `Api-<env>` — API Lambda + HTTP API
+9. `Workers-<env>` — one Lambda per SQS queue
+10. `Monitoring-<env>` — SNS alarm topic, alarms, dashboard
+
+**Migrations** run separately (they need network access to RDS):
+`DATABASE_URL=<rds connection string> pnpm --filter @cloud-commerce/database migrate:up`
+— from a bastion / CI runner with VPC access, before the first Workers deploy.
+
+**Deliberate failure scenario** (non-prod): add `-c paymentFaultRate=0.5` to a
+`Workers-<env>` deploy to arm the payment fault injector (see
+`docs/troubleshooting.md`).
 
 ## CI/CD (`.github/workflows`)
 

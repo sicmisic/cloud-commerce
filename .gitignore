@@ -18,6 +18,10 @@ cdk.out/
 .env.*
 !.env.example
 
+# Agent / editor tooling
+.claude/
+CLAUDE.md
+
 # Editor / OS
 .DS_Store
 .idea/

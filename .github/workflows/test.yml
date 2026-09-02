@@ -47,6 +47,14 @@ jobs:
       - name: E2E tests
         run: pnpm test:e2e
 
+      - name: Build frontend
+        run: pnpm --filter @cloud-commerce/frontend build
+
+      - name: Synthesize infrastructure
+        run: pnpm --filter @cloud-commerce/infrastructure synth
+        env:
+          ENV: dev
+
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15

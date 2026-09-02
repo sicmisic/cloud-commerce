@@ -1,0 +1,150 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 44px; /* comfortable tap target */
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.05s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn--primary {
+  background: var(--c-primary);
+  color: var(--c-primary-contrast);
+}
+.btn--primary:hover:not([disabled]) {
+  background: var(--c-primary-hover);
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--c-text);
+  border-color: var(--c-border);
+}
+.btn--ghost:hover:not([disabled]) {
+  background: var(--c-surface-2);
+}
+.btn--block {
+  width: 100%;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 2px var(--s-2);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: var(--c-surface-2);
+  color: var(--c-text-muted);
+}
+.badge--success {
+  background: color-mix(in srgb, var(--c-success) 16%, transparent);
+  color: var(--c-success);
+}
+.badge--warning {
+  background: color-mix(in srgb, var(--c-warning) 18%, transparent);
+  color: var(--c-warning);
+}
+.badge--danger {
+  background: color-mix(in srgb, var(--c-danger) 16%, transparent);
+  color: var(--c-danger);
+}
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid var(--c-border);
+  border-top-color: var(--c-primary);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.state {
+  text-align: center;
+  padding: var(--s-8) var(--s-4);
+  color: var(--c-text-muted);
+}
+.state h3 {
+  color: var(--c-text);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--s-2);
+}
+.state--error h3 {
+  color: var(--c-danger);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.field label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.field input {
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+}
+.field .hint {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+.field--error input {
+  border-color: var(--c-danger);
+}
+.field--error .hint {
+  color: var(--c-danger);
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--c-surface-2) 25%,
+    var(--c-border) 37%,
+    var(--c-surface-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--r-md);
+}
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}

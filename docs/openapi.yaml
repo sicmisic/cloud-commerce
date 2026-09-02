@@ -1,0 +1,461 @@
+openapi: 3.1.0
+info:
+  title: Cloud Commerce & Inventory API
+  version: 0.1.0
+  description: >
+    Event-driven commerce and inventory backend. Errors are
+    `application/problem+json` (RFC 7807-style). Retryable mutations require an
+    `Idempotency-Key` header. Send `x-correlation-id` to thread a trace.
+  license:
+    name: MIT
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com
+    variables:
+      apiId: { default: 'REPLACE' }
+      region: { default: 'us-east-1' }
+
+tags:
+  - name: health
+  - name: catalog
+  - name: customers
+  - name: orders
+  - name: admin
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+                  version: { type: string }
+                  stage: { type: string }
+                  uptimeSeconds: { type: integer }
+
+  /health/ready:
+    get:
+      tags: [health]
+      summary: Readiness — which downstreams are configured
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /products:
+    get:
+      tags: [catalog]
+      summary: List / filter products
+      security: []
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ProductStatus' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: A page of products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  nextCursor: { type: [string, 'null'] }
+    post:
+      tags: [catalog]
+      summary: Create a product
+      description: Requires the `catalog:write` permission (OPERATIONS / ADMIN).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProduct' }
+      responses:
+        '201':
+          {
+            description: Created,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /products/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [catalog]
+      summary: Get a product
+      security: []
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [catalog]
+      summary: Update a product
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateProduct' } } }
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [catalog]
+      summary: Archive a product
+      responses:
+        '204': { description: Archived }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /products/by-sku/{sku}:
+    get:
+      tags: [catalog]
+      summary: Look up a product by SKU
+      security: []
+      parameters:
+        - { name: sku, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /products/{id}/inventory/adjust:
+    post:
+      tags: [catalog]
+      summary: Restock / correct on-hand stock
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta]
+              properties:
+                delta: { type: integer, description: 'non-zero' }
+                reason: { type: string }
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } },
+          }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /customers:
+    post:
+      tags: [customers]
+      summary: Register the caller's customer profile (idempotent by email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name]
+              properties:
+                email: { type: string, format: email }
+                name: { type: string }
+      responses:
+        '201': { description: Created }
+
+  /customers/me:
+    get:
+      tags: [customers]
+      summary: The caller's customer profile
+      responses:
+        '200': { description: OK }
+
+  /customers/{id}/orders:
+    get:
+      tags: [orders]
+      summary: List a customer's orders (own, or `order:read:any`)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /orders:
+    post:
+      tags: [orders]
+      summary: Create an order
+      description: >
+        Requires `order:create` and an `Idempotency-Key` header. Line prices are
+        resolved server-side from the catalog; the client cannot set a price.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrder' } } }
+      responses:
+        '201':
+          {
+            description: Created,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } },
+          }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: Duplicate key / mismatch / out of stock / unregistered caller
+          content:
+            { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}:
+    get:
+      tags: [orders]
+      summary: Get an order (own, or `order:read:any`)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } },
+          }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/cancel:
+    post:
+      tags: [orders]
+      summary: Cancel an order and release reserved inventory
+      description: Requires `order:cancel:any` (OPERATIONS / ADMIN).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { reason: { type: string } }
+      responses:
+        '202':
+          {
+            description: Accepted,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } },
+          }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /admin/failed-events:
+    get:
+      tags: [admin]
+      summary: DLQ depth + a non-destructive sample per queue
+      description: Requires `admin:failed-events:read`.
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /admin/failed-events/{queue}/retry:
+    post:
+      tags: [admin]
+      summary: Re-drive a DLQ back to its source queue
+      description: Requires `admin:failed-events:retry`. `queue` ∈ payment|email|shipping|inventory.
+      parameters:
+        - {
+            name: queue,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [payment, email, shipping, inventory] },
+          }
+      responses:
+        '202': { description: Redrive task started }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito ID token.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+
+  responses:
+    Problem:
+      description: RFC 7807-style problem document
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        correlationId: { type: string }
+        issues:
+          type: array
+          items:
+            type: object
+            properties: { path: { type: string }, message: { type: string } }
+
+    Money:
+      type: object
+      properties:
+        amount: { type: integer, description: minor units (cents) }
+        currency: { type: string, example: USD }
+        display: { type: string, example: '$19.99' }
+
+    ProductStatus:
+      type: string
+      enum: [active, inactive, archived]
+
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        price: { $ref: '#/components/schemas/Money' }
+        inventory:
+          type: object
+          properties:
+            available: { type: integer }
+            reserved: { type: integer }
+        imageKeys: { type: array, items: { type: string } }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateProduct:
+      type: object
+      required: [sku, name, description, category, price, initialStock]
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price:
+          type: object
+          required: [amount]
+          properties:
+            amount: { type: integer, minimum: 1 }
+            currency: { type: string, default: USD }
+        initialStock: { type: integer, minimum: 0 }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        imageKeys: { type: array, items: { type: string } }
+
+    UpdateProduct:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price: { $ref: '#/components/schemas/Money' }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        imageKeys: { type: array, items: { type: string } }
+
+    Address:
+      type: object
+      required: [name, line1, city, region, postalCode, country]
+      properties:
+        name: { type: string }
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        region: { type: string }
+        postalCode: { type: string }
+        country: { type: string, minLength: 2, maxLength: 2 }
+
+    CreateOrder:
+      type: object
+      required: [lines, shippingAddress]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: { type: string }
+              quantity: { type: integer, minimum: 1 }
+        shippingAddress: { $ref: '#/components/schemas/Address' }
+        billingAddress: { $ref: '#/components/schemas/Address' }
+
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        customerId: { type: string }
+        status: { type: string, enum: [pending, confirmed, processing, fulfilled, cancelled] }
+        currency: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              productId: { type: string }
+              sku: { type: string }
+              name: { type: string }
+              unitPrice: { type: integer }
+              quantity: { type: integer }
+              lineTotal: { type: integer }
+        subtotal: { type: integer }
+        tax: { type: integer }
+        shippingFee: { type: integer }
+        total: { type: integer }
+        totalDisplay: { type: string }
+        payments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              status: { type: string }
+              amount: { type: integer }
+        shipments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              status: { type: string }
+              trackingNumber: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }

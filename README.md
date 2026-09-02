@@ -6,7 +6,8 @@ Lambda, DynamoDB for the catalog, PostgreSQL for orders, EventBridge + SQS for
 asynchronous order processing, Cognito for auth, and CloudWatch for
 observability, all provisioned with AWS CDK.
 
-> **Status:** actively being built phase by phase. See [Build Status](#build-status).
+> **Status:** all seven build phases complete — 129 tests, 10 CDK stacks that
+> synthesize cleanly, and a working storefront. See [Build Status](#build-status).
 
 ---
 
@@ -44,9 +45,9 @@ flowchart LR
   services + ports). Adapters (`packages/database`, `packages/events`,
   `packages/integrations`, `packages/auth`) implement the ports.
 - **One API Lambda** with a dependency-free internal router
-  ([ADR 005](docs/adr/005-single-api-lambda.md)).
-- **CDK**, one stack per concern: `Storage`, `Database`, `Messaging`, `Api`,
-  `Monitoring`.
+  ([ADR 005](docs/adr/005-single-api-lambda.md)); one worker Lambda per SQS queue.
+- **CDK**, one stack per concern: `Network`, `Storage`, `Database`, `Rds`,
+  `Secrets`, `Messaging`, `Auth`, `Api`, `Workers`, `Monitoring`.
 
 ## Features
 
@@ -60,7 +61,7 @@ flowchart LR
 | Async processing: EventBridge, SQS workers, DLQs, idempotency      | ✅ Phase 4 |
 | Cognito auth, RBAC, least-privilege IAM, Secrets Manager           | ✅ Phase 5 |
 | Alarms, dashboards, deliberate failure scenario + runbook          | ✅ Phase 6 |
-| OpenAPI spec, E2E/perf tests, storefront UI                        | 🔜 Phase 7 |
+| OpenAPI spec, E2E/perf tests, storefront UI                        | ✅ Phase 7 |
 
 ## Technology Stack
 
@@ -91,13 +92,17 @@ flowchart LR
 
 ## API Documentation
 
-See [`docs/api.md`](docs/api.md). Machine-readable OpenAPI spec lands in Phase 7.
-
-Currently live:
+Human summary: [`docs/api.md`](docs/api.md). Machine-readable contract:
+[`docs/openapi.yaml`](docs/openapi.yaml) (OpenAPI 3.1). Endpoints:
 
 ```
-GET /health         → { status: "ok", version, stage, uptimeSeconds }
-GET /health/ready    → { status, checks: { catalogTable, database, ... } }
+GET   /health                              GET   /products, /products/{id}, /products/by-sku/{sku}
+POST  /products  PATCH /products/{id}       DELETE /products/{id}
+POST  /products/{id}/inventory/adjust
+POST  /customers                           GET   /customers/me
+POST  /orders (Idempotency-Key)            GET   /orders/{id}
+GET   /customers/{id}/orders               POST  /orders/{id}/cancel
+GET   /admin/failed-events                 POST  /admin/failed-events/{queue}/retry
 ```
 
 ## Database Design
@@ -126,11 +131,13 @@ See [ADR 003](docs/adr/003-event-driven-processing.md).
 
 ## Authentication & Authorization
 
-Cognito issues JWTs; the API verifies them Lambda-side and derives permissions
-from Cognito group membership: `CUSTOMER`, `OPERATIONS`, `ADMIN`. Handlers assert
-on a **permission** (`catalog:write`, `order:read:any`, …), not a role name.
-Full wiring in Phase 5. See [ADR 005](docs/adr/005-single-api-lambda.md) for the
-IAM-scope note.
+Cognito issues JWTs; the API verifies them Lambda-side (`aws-jwt-verify` —
+signature, issuer, audience, expiry) and derives permissions from Cognito group
+membership: `CUSTOMER`, `OPERATIONS`, `ADMIN`. Handlers assert on a
+**permission** (`catalog:write`, `order:read:any`, …), not a role name. A
+PostConfirmation trigger provisions the customer row and assigns the default
+group. Every mutation is audit-logged. See
+[ADR 005](docs/adr/005-single-api-lambda.md) for the IAM-scope note.
 
 ## Reliability
 
@@ -151,9 +158,10 @@ IAM-scope note.
 - CloudWatch metrics via EMF: `OrdersCreated`, `OrdersFailed`, `PaymentFailures`,
   `InventoryReservationFailures`, `LambdaErrors`, `LambdaDuration`, `QueueDepth`,
   `DLQMessages`.
-- Alarms + dashboard + a deliberately triggerable failure scenario with a
-  documented runbook: [`docs/troubleshooting.md`](docs/troubleshooting.md)
-  (Phase 6).
+- Alarms (API error rate, API 5xx, per-queue backlog, per-DLQ message count,
+  RDS CPU/connections) → SNS; a CloudWatch dashboard; and a deliberately
+  triggerable failure scenario with a documented runbook:
+  [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ## Security
 
@@ -188,9 +196,14 @@ docker run -p 8000:8000 amazon/dynamodb-local
 docker run -p 5432:5432 -e POSTGRES_USER=commerce -e POSTGRES_PASSWORD=commerce -e POSTGRES_DB=commerce postgres:16-alpine
 
 pnpm build
-pnpm --filter @cloud-commerce/api dev     # http://localhost:4000
+pnpm --filter @cloud-commerce/api dev        # API on http://localhost:4000
+pnpm --filter @cloud-commerce/frontend dev   # storefront on http://localhost:5173
 curl localhost:4000/health
 ```
+
+The storefront runs against an **in-memory mock** by default (every UI state is
+exercised: loading, empty, error, out-of-stock, the async order lifecycle). Set
+`VITE_API_BASE_URL` to point it at a running API.
 
 ## Deployment
 
@@ -228,7 +241,11 @@ via OIDC).
 - Small Postgres connection pool per Lambda; RDS Proxy is the documented next
   step for connection storms.
 - DynamoDB access is key/Query only — no Scan on the request path.
-- Detailed load/latency budgets and k6 scripts land in Phase 7.
+- Latency budget (encoded as k6 thresholds in
+  [`tests/performance/order-flow.js`](tests/performance/order-flow.js)):
+  `GET /products` p95 < 300 ms, `GET /products/{id}` p95 < 150 ms,
+  `POST /orders` p95 < 800 ms, error rate < 1%.
+  Run: `k6 run -e BASE_URL=<api> -e TOKEN=<jwt> tests/performance/order-flow.js`.
 
 ## Future Improvements
 
@@ -250,7 +267,7 @@ Tracked as they are deferred:
 | 4     | Distributed processing: EventBridge, SQS + DLQs, worker Lambdas, retries, idempotency, admin failed-events endpoints                                                                            | ✅ done |
 | 5     | Security: Cognito, JWT verification, RBAC, least-privilege IAM per Lambda, Secrets Manager                                                                                                      | ✅ done |
 | 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ✅ done |
-| 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ⬜ next |
+| 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ✅ done |
 
 ### Phase 1 — what was built / what is deferred
 
@@ -405,3 +422,41 @@ fraction of charges transiently, which flows retries → DLQ → alarm.
 segments (correlation id already threads everything); anomaly-detection alarms;
 a synthetic canary hitting `/health` (the deploy pipeline's smoke test covers
 the basics).
+
+### Phase 7 — what was built
+
+**Built:** `docs/openapi.yaml` — a complete OpenAPI 3.1 spec for every endpoint
+(health, catalog, customers, orders, admin) with schemas, security, the
+`Idempotency-Key` parameter, and the RFC 7807 problem shape. `apps/frontend` —
+a **React + Vite storefront** consuming the API (or an in-memory mock when
+`VITE_API_BASE_URL` is unset): design-token CSS (light/dark, no hardcoded hex
+outside the token file), accessible primitives (44 px targets, visible focus,
+`prefers-reduced-motion`, skip link, ARIA on every control), and every UI state
+handled — loading skeletons, empty, error+retry, out-of-stock, and a polling
+order tracker that follows `pending → confirmed → processing`. Pages: catalog
+with category filter, product detail with quantity stepper, cart
+(localStorage-backed, quota-safe), a validated checkout form, and the order
+status page. `tests/performance/order-flow.js` — a k6 script encoding the
+latency budget as thresholds. `LICENSE` (MIT). CI now builds the frontend and
+runs `cdk synth` on every PR. Final pass over the README and all seven docs.
+
+**End-to-end verified in a browser:** browse → add to cart → checkout → order
+created → tracker advances to "processing" with a captured payment and a
+tracking number, driven by the mock's simulated async pipeline.
+
+## Repository layout
+
+```
+cloud-commerce/
+├── apps/
+│   ├── api/          HTTP framework, middleware, routes, controllers, Lambda adapter
+│   ├── workers/      SQS worker Lambdas (payment/email/shipping/inventory) + Cognito trigger
+│   └── frontend/     React + Vite storefront
+├── packages/
+│   ├── domain/       entities, value objects, ports, application + fulfillment services
+│   ├── config/ logging/ validation/ database/ events/ integrations/ auth/
+├── infrastructure/   AWS CDK — 10 stacks (Network, Storage, Database, Rds, Secrets,
+│                     Messaging, Auth, Api, Workers, Monitoring)
+├── tests/            unit / contract / integration / e2e / performance
+└── docs/             architecture, api, database, deployment, troubleshooting, openapi, adr/
+```
