@@ -1,19 +1,19 @@
 # Cloud Commerce & Inventory API
 
 An event-driven commerce and inventory backend on AWS, built to demonstrate
-production-grade engineering judgement — not a tutorial CRUD app. TypeScript on
+production-grade engineering judgement - not a tutorial CRUD app. TypeScript on
 Lambda, DynamoDB for the catalog, PostgreSQL for orders, EventBridge + SQS for
 asynchronous order processing, Cognito for auth, and CloudWatch for
 observability, all provisioned with AWS CDK.
 
-> **Status:** all seven build phases complete — 129 tests, 10 CDK stacks that
+> **Status:** all seven build phases complete - 129 tests, 10 CDK stacks that
 > synthesize cleanly, and a working storefront. See [Build Status](#build-status).
 
 ---
 
 ## Overview
 
-Placing an order kicks off several independent side effects — reserve
+Placing an order kicks off several independent side effects - reserve
 inventory, charge payment, send a confirmation, request a shipment. Each has its
 own latency and failure profile, so the HTTP request that creates the order does
 the minimum synchronously (validate → reserve inventory → persist → publish
@@ -131,7 +131,7 @@ See [ADR 003](docs/adr/003-event-driven-processing.md).
 
 ## Authentication & Authorization
 
-Cognito issues JWTs; the API verifies them Lambda-side (`aws-jwt-verify` —
+Cognito issues JWTs; the API verifies them Lambda-side (`aws-jwt-verify` -
 signature, issuer, audience, expiry) and derives permissions from Cognito group
 membership: `CUSTOMER`, `OPERATIONS`, `ADMIN`. Handlers assert on a
 **permission** (`catalog:write`, `order:read:any`, …), not a role name. A
@@ -148,7 +148,7 @@ group. Every mutation is audit-logged. See
 - Inventory reservation uses optimistic concurrency (conditional writes) to
   prevent overselling the last unit.
 - External providers are interfaces with `Mock*` implementations that can
-  simulate decline, rate-limit, 5xx, and timeout — no call is assumed to succeed.
+  simulate decline, rate-limit, 5xx, and timeout - no call is assumed to succeed.
 
 ## Observability
 
@@ -165,7 +165,7 @@ group. Every mutation is audit-logged. See
 
 ## Security
 
-- No secret is ever hardcoded — Secrets Manager, referenced by ARN.
+- No secret is ever hardcoded - Secrets Manager, referenced by ARN.
 - Each Lambda's IAM role is scoped to the exact tables / queues / secrets it
   uses; no broad managed policies.
 - All input validated with Zod at the boundary before business logic.
@@ -222,17 +222,17 @@ via OIDC).
 
 ## Troubleshooting
 
-[`docs/troubleshooting.md`](docs/troubleshooting.md) — the alarm → correlation id
+[`docs/troubleshooting.md`](docs/troubleshooting.md) - the alarm → correlation id
 → logs → root cause path.
 
 ## ADRs
 
-- [001 — DynamoDB for the product catalog](docs/adr/001-dynamodb-catalog.md)
-- [002 — PostgreSQL for orders](docs/adr/002-rds-orders.md)
-- [003 — EventBridge + SQS for order processing](docs/adr/003-event-driven-processing.md)
-- [004 — Idempotency keys](docs/adr/004-idempotency.md)
-- [005 — One API Lambda with an internal router](docs/adr/005-single-api-lambda.md)
-- [006 — Provider ports in the domain; a `fulfillment` module](docs/adr/006-ports-and-fulfillment-module.md)
+- [001 - DynamoDB for the product catalog](docs/adr/001-dynamodb-catalog.md)
+- [002 - PostgreSQL for orders](docs/adr/002-rds-orders.md)
+- [003 - EventBridge + SQS for order processing](docs/adr/003-event-driven-processing.md)
+- [004 - Idempotency keys](docs/adr/004-idempotency.md)
+- [005 - One API Lambda with an internal router](docs/adr/005-single-api-lambda.md)
+- [006 - Provider ports in the domain; a `fulfillment` module](docs/adr/006-ports-and-fulfillment-module.md)
 
 ## Performance Considerations
 
@@ -240,7 +240,7 @@ via OIDC).
 - One warm client per container for DynamoDB / Secrets Manager / EventBridge.
 - Small Postgres connection pool per Lambda; RDS Proxy is the documented next
   step for connection storms.
-- DynamoDB access is key/Query only — no Scan on the request path.
+- DynamoDB access is key/Query only - no Scan on the request path.
 - Latency budget (encoded as k6 thresholds in
   [`tests/performance/order-flow.js`](tests/performance/order-flow.js)):
   `GET /products` p95 < 300 ms, `GET /products/{id}` p95 < 150 ms,
@@ -269,7 +269,7 @@ Tracked as they are deferred:
 | 6     | Operations: metrics, alarms, dashboard, deliberate failure scenario + runbook                                                                                                                   | ✅ done |
 | 7     | Polish: OpenAPI, architecture diagram, deployment docs, perf/E2E tests, storefront UI, final README pass                                                                                        | ✅ done |
 
-### Phase 1 — what was built / what is deferred
+### Phase 1 - what was built / what is deferred
 
 **Built:** pnpm workspace + TS project references; `config` (validated env
 contract), `logging` (Pino + ALS correlation + EMF metrics), `validation` (Zod
@@ -288,19 +288,19 @@ DLQs (Phase 4); alarms + dashboard widgets + the failure-scenario runbook
 `LogGroup` migration is done for the API function; worker functions get the same
 treatment when they are created.
 
-### Phase 2 — what was built / what is deferred
+### Phase 2 - what was built / what is deferred
 
-**Built:** `domain/product` — `Product` aggregate (`createProduct`,
+**Built:** `domain/product` - `Product` aggregate (`createProduct`,
 `applyUpdate`, `isSellable`), `ProductRepository` port, `CatalogService`
 (create/read/list/update/archive/adjust-stock/reserve/release), and a reference
-`InMemoryProductRepository` that mirrors the DynamoDB semantics. `database` —
+`InMemoryProductRepository` that mirrors the DynamoDB semantics. `database` -
 `DynamoProductRepository` with a keys module (`product-keys.ts`) mapping each of
 the five access patterns to a `GetItem`/`Query`/conditional `UpdateItem`; no
-`Scan`. `validation` — `createProductSchema` / `updateProductSchema` /
+`Scan`. `validation` - `createProductSchema` / `updateProductSchema` /
 `listProductsQuerySchema` / `adjustStockSchema` (SKU normalised to upper-case,
-price in minor units). `api` — `ProductController` (thin), catalog routes, and a
-composition-root `container.ts` with test seams. Infra — `catalog` table gains
-GSI1 (category) / GSI2 (SKU) / GSI3 (status). Tests — 22 new (product domain,
+price in minor units). `api` - `ProductController` (thin), catalog routes, and a
+composition-root `container.ts` with test seams. Infra - `catalog` table gains
+GSI1 (category) / GSI2 (SKU) / GSI3 (status). Tests - 22 new (product domain,
 CatalogService incl. the oversell-under-concurrency case, product E2E through
 the handler) + a DynamoDB-Local integration suite that self-skips without
 `DYNAMODB_ENDPOINT` and runs in CI.
@@ -310,133 +310,133 @@ the handler) + a DynamoDB-Local integration suite that self-skips without
 the catalog service; product-image upload (presigned S3 `PUT`) is Phase 7;
 full-text search is a documented Future Improvement (OpenSearch).
 
-### Phase 3 — what was built / what is deferred
+### Phase 3 - what was built / what is deferred
 
 **Built:** `domain/customer` (Customer aggregate, `CustomerService`, port +
-in-memory repo) and `domain/order` — the `Order` aggregate with an explicit
+in-memory repo) and `domain/order` - the `Order` aggregate with an explicit
 state machine (`pending→confirmed→processing→fulfilled` / `→cancelled`), a pure
 `priceOrder` policy (8% tax, free shipping ≥ $75), `Payment` / `Shipment`
 sub-entities, domain events (`OrderCreated`, `PaymentRequested`,
-`OrderCancelled`), the `OrderRepository` port, and `OrderService` —
+`OrderCancelled`), the `OrderRepository` port, and `OrderService` -
 **the cross-datastore use case**: resolve prices from the DynamoDB catalog →
 reserve inventory (conditional writes) → persist order+items+payment+shipment in
 one Postgres transaction → publish events, with **compensating inventory
-release on every failure path** and idempotency-key replay. `database` —
+release on every failure path** and idempotency-key replay. `database` -
 `getPool` (credentials from Secrets Manager by ARN, or `DATABASE_URL` locally),
 `withTransaction`, `PostgresCustomerRepository`, `PostgresOrderRepository`, and
 the SQL migration (`node-pg-migrate`) with every index documented.
-`validation` — order / customer schemas. `api` — `OrderController` /
+`validation` - order / customer schemas. `api` - `OrderController` /
 `CustomerController` with ownership checks (own vs `order:read:any`), routes,
-container wiring. Infra — `NetworkStack` (VPC, no NAT, VPC endpoints),
+container wiring. Infra - `NetworkStack` (VPC, no NAT, VPC endpoints),
 `RdsStack` (Postgres 16, generated-secret credentials); the API Lambda now runs
-in the VPC with a scoped SG and `secret.grantRead`. Tests — 23 new (order +
+in the VPC with a scoped SG and `secret.grantRead`. Tests - 23 new (order +
 pricing domain, `OrderService` incl. compensation & idempotency, order E2E
 through the handler) + a Postgres integration suite (self-skips without
 `DATABASE_URL`, runs migrations then hits a real DB in CI). 77 pass / 12 skip.
 
 **Deferred:** the DynamoDB HTTP-layer idempotency store (ADR 004) lands in
-Phase 4 — Phase 3 relies on the `orders.idempotency_key` unique index as the
+Phase 4 - Phase 3 relies on the `orders.idempotency_key` unique index as the
 safety net and the service's replay check. Payment capture / email / shipping
 are just events + rows now; their workers are Phase 4. RDS Proxy for connection
 pooling is a documented Future Improvement.
 
-### Phase 4 — what was built / what is deferred
+### Phase 4 - what was built / what is deferred
 
-**Built:** `domain/shared/idempotency` — `IdempotencyStore` port + in-memory
-double; `database` — `DynamoIdempotencyStore` (conditional-put claim, TTL,
-`claimed`/`completed`/`in_progress`/`mismatch`). `domain/ports` — the provider
+**Built:** `domain/shared/idempotency` - `IdempotencyStore` port + in-memory
+double; `database` - `DynamoIdempotencyStore` (conditional-put claim, TTL,
+`claimed`/`completed`/`in_progress`/`mismatch`). `domain/ports` - the provider
 interfaces moved here ([ADR 006](docs/adr/006-ports-and-fulfillment-module.md));
-`integrations` is now implementations only. `domain/fulfillment` — the four
+`integrations` is now implementations only. `domain/fulfillment` - the four
 worker application services: **PaymentProcessor** (charge → confirm order →
 `PaymentCompleted`; decline → `PaymentFailed` + ack; transient → rethrow for
 SQS retry → DLQ), **ShipmentProcessor** (label → `processing` →
 `ShipmentDispatched`), **NotificationSender** (template email per event),
-**InventoryReleaser** (compensating release on `OrderCancelled`) — each
-idempotent via the store. `apps/workers` — `createEventWorker` runtime
+**InventoryReleaser** (compensating release on `OrderCancelled`) - each
+idempotent via the store. `apps/workers` - `createEventWorker` runtime
 (EventBridge-envelope unwrap, correlation scope, **partial batch failure**
-response), a worker container, and the 4 thin handlers. `apps/api` —
+response), a worker container, and the 4 thin handlers. `apps/api` -
 HTTP-layer idempotency wired into `POST /orders` (claim → replay → 409 on
-mismatch), `AdminController` + `/admin/failed-events` routes. `events` —
+mismatch), `AdminController` + `/admin/failed-events` routes. `events` -
 `DlqAdmin` (depth + sample per DLQ; native SQS message-move redrive) behind a
-`DlqAdminPort`. Infra — `MessagingStack` now creates the 4 SQS queues + DLQs
+`DlqAdminPort`. Infra - `MessagingStack` now creates the 4 SQS queues + DLQs
 (`maxReceiveCount: 5`, 180 s visibility) + EventBridge rules; `WorkersStack`
 adds one VPC Lambda per queue with `reportBatchItemFailures` and per-worker
-least-privilege grants. Tests — PaymentProcessor unit (4), event-worker unit
+least-privilege grants. Tests - PaymentProcessor unit (4), event-worker unit
 (4), the **full fulfillment pipeline E2E** (5: happy path, decline, transient →
 DLQ, idempotent replay, cancel), admin E2E (3). 93 pass / 12 skip.
 
-**Deferred:** payment method tokenisation (a placeholder token is used now —
-Phase 5); `fulfilled` transition (carrier delivery webhook — out of scope);
+**Deferred:** payment method tokenisation (a placeholder token is used now -
+Phase 5); `fulfilled` transition (carrier delivery webhook - out of scope);
 a transactional outbox for guaranteed event publication (currently a failed
-publish after a persisted order is logged, not lost-safe) — a documented Future
+publish after a persisted order is logged, not lost-safe) - a documented Future
 Improvement.
 
-### Phase 5 — what was built / what is deferred
+### Phase 5 - what was built / what is deferred
 
-**Built:** `AuthStack` — Cognito user pool (email sign-in, 12-char password
+**Built:** `AuthStack` - Cognito user pool (email sign-in, 12-char password
 policy, optional MFA in prod), a public SPA client (1 h tokens), three groups
 named for the RBAC roles (`CUSTOMER` / `OPERATIONS` / `ADMIN`), and a
 **PostConfirmation trigger** Lambda (`apps/workers/src/auth/post-confirmation.ts`)
 that adds new users to `CUSTOMER` and provisions their customer row (idempotent).
-`auth` package — `CognitoTokenVerifier` (aws-jwt-verify; validates signature,
+`auth` package - `CognitoTokenVerifier` (aws-jwt-verify; validates signature,
 issuer, audience, expiry) wired into `withAuth`; when no pool is configured
 (local) it falls back to a `FakeTokenVerifier` + the `x-debug-claims` header,
 which config **hard-disables in production** and CDK sets `false` in every
-deployed env. RBAC — handlers assert on a **permission**
+deployed env. RBAC - handlers assert on a **permission**
 (`catalog:write`, `order:read:any`, …), derived from group membership, never a
-role name. `apps/api` — new `withAudit` middleware: one structured `audit` line
-per state-changing request (actor, action, params, outcome). Least-privilege —
+role name. `apps/api` - new `withAudit` middleware: one structured `audit` line
+per state-changing request (actor, action, params, outcome). Least-privilege -
 every Lambda role was already scoped per resource; Phase 5 adds
 `cognito-idp:AdminAddUserToGroup` (trigger only) and `secret:GetSecretValue` on
-the provider secrets. `SecretsStack` — placeholder Secrets Manager entries for
-the payment / shipping provider keys, referenced by ARN. `NetworkStack` — a
+the provider secrets. `SecretsStack` - placeholder Secrets Manager entries for
+the payment / shipping provider keys, referenced by ARN. `NetworkStack` - a
 `cognito-idp` interface VPC endpoint so JWKS fetch + admin calls work from the
-NAT-less VPC. Tests — verifier unit (8), RBAC unit (5), audit middleware unit
+NAT-less VPC. Tests - verifier unit (8), RBAC unit (5), audit middleware unit
 (3), auth+RBAC E2E through the handler (5). 114 pass / 12 skip.
 
 **Deferred:** a Lambda authorizer on API Gateway (verification is currently
-in-process at the router boundary — simpler, one fewer Lambda, and the internal
+in-process at the router boundary - simpler, one fewer Lambda, and the internal
 router needs the principal anyway; ADR 005 covers the single-Lambda trade-off);
 fine-grained per-tenant data isolation; a managed WAF ACL is a Future Improvement.
 
-### Phase 6 — what was built / what is deferred
+### Phase 6 - what was built / what is deferred
 
-**Built:** `domain/shared/metrics` — `MetricsSink` port + `noopMetrics` +
-`BUSINESS_METRIC` names; `logging` — `emfMetricsSink` adapter. `OrderService` /
+**Built:** `domain/shared/metrics` - `MetricsSink` port + `noopMetrics` +
+`BUSINESS_METRIC` names; `logging` - `emfMetricsSink` adapter. `OrderService` /
 `PaymentProcessor` now emit `OrdersCreated` / `OrdersFailed` /
 `InventoryReservationFailures` / `IdempotentReplay` / `PaymentFailures` (via the
 injected sink; the API + worker containers wire the EMF adapter). `request-context`
 middleware already emitted `LambdaDuration` / `LambdaErrors`; the worker runtime
-does the same per message. `MonitoringStack` (rewritten) — an SNS alarm topic
+does the same per message. `MonitoringStack` (rewritten) - an SNS alarm topic
 (`ALARM_EMAIL` subscription) and the full alarm set the spec asks for: API
 Lambda error rate, API 5xx rate, per-queue backlog, **per-DLQ message count
 (threshold 0)**, RDS CPU + connections; plus a dashboard with Orders / Failures
-/ API latency (p50·p99) / DLQ-depth widgets. Deliberate failure scenario —
+/ API latency (p50·p99) / DLQ-depth widgets. Deliberate failure scenario -
 `paymentFaultRate` CDK context → `PAYMENT_MOCK_FAILURE_RATE` on the worker
 (never armed in production); the mock payment provider then fails a controlled
 fraction of charges transiently, which flows retries → DLQ → alarm.
 `docs/troubleshooting.md` is the full alarm → correlation-id → logs → root-cause
-→ redrive runbook. Tests — business-metrics unit (3). 117 pass / 12 skip.
+→ redrive runbook. Tests - business-metrics unit (3). 117 pass / 12 skip.
 
 **Deferred:** distributed tracing spans beyond X-Ray's automatic Lambda/SDK
 segments (correlation id already threads everything); anomaly-detection alarms;
 a synthetic canary hitting `/health` (the deploy pipeline's smoke test covers
 the basics).
 
-### Phase 7 — what was built
+### Phase 7 - what was built
 
-**Built:** `docs/openapi.yaml` — a complete OpenAPI 3.1 spec for every endpoint
+**Built:** `docs/openapi.yaml` - a complete OpenAPI 3.1 spec for every endpoint
 (health, catalog, customers, orders, admin) with schemas, security, the
-`Idempotency-Key` parameter, and the RFC 7807 problem shape. `apps/frontend` —
+`Idempotency-Key` parameter, and the RFC 7807 problem shape. `apps/frontend` -
 a **React + Vite storefront** consuming the API (or an in-memory mock when
 `VITE_API_BASE_URL` is unset): design-token CSS (light/dark, no hardcoded hex
 outside the token file), accessible primitives (44 px targets, visible focus,
 `prefers-reduced-motion`, skip link, ARIA on every control), and every UI state
-handled — loading skeletons, empty, error+retry, out-of-stock, and a polling
+handled - loading skeletons, empty, error+retry, out-of-stock, and a polling
 order tracker that follows `pending → confirmed → processing`. Pages: catalog
 with category filter, product detail with quantity stepper, cart
 (localStorage-backed, quota-safe), a validated checkout form, and the order
-status page. `tests/performance/order-flow.js` — a k6 script encoding the
+status page. `tests/performance/order-flow.js` - a k6 script encoding the
 latency budget as thresholds. `LICENSE` (MIT). CI now builds the frontend and
 runs `cdk synth` on every PR. Final pass over the README and all seven docs.
 
@@ -455,7 +455,7 @@ cloud-commerce/
 ├── packages/
 │   ├── domain/       entities, value objects, ports, application + fulfillment services
 │   ├── config/ logging/ validation/ database/ events/ integrations/ auth/
-├── infrastructure/   AWS CDK — 10 stacks (Network, Storage, Database, Rds, Secrets,
+├── infrastructure/   AWS CDK - 10 stacks (Network, Storage, Database, Rds, Secrets,
 │                     Messaging, Auth, Api, Workers, Monitoring)
 ├── tests/            unit / contract / integration / e2e / performance
 └── docs/             architecture, api, database, deployment, troubleshooting, openapi, adr/
