@@ -73,7 +73,7 @@ export async function createCatalogTable(client: DynamoDBClient, tableName: stri
       ],
     }),
   );
-  await waitUntilTableExists({ client, maxWaitTime: 20 }, { TableName: tableName });
+  await waitUntilTableExists({ client, maxWaitTime: 30, minDelay: 1 }, { TableName: tableName });
 }
 
 export async function dropTable(client: DynamoDBClient, tableName: string): Promise<void> {
